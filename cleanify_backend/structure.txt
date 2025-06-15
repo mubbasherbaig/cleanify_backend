@@ -1,0 +1,47 @@
+cleanify_backend/
+│
+├── run.py                 # smallest possible entrypoint (creates app & socketio, runs server)
+├── requirements.txt
+├── config.py              # env reading, global constants, default sliders etc.
+│
+├── cleanify/
+│   ├── __init__.py        # factory → create_app(), register_blueprints(), init_extensions()
+│   │
+│   ├── extensions.py      # SocketIO, SQLAlchemy / or-marshm, APScheduler / Celery, etc.
+│   │
+│   ├── api/               # purely request/response; NO core logic here
+│   │   ├── __init__.py
+│   │   └── routes/
+│   │        ├── simulation.py       # play / pause / speed / traffic endpoints
+│   │        ├── settings.py         # threshold mode, working hours, global toggles
+│   │        ├── bins.py             # CRUD + manual-collect operations
+│   │        ├── trucks.py           # CRUD + capacity editing
+│   │        └── optimization.py     # trigger manual optimization, return route JSON
+│   │
+│   ├── sockets/
+│   │   ├── __init__.py
+│   │   └── events.py       # all real-time emits & on events (simulation_tick, route_updated…)
+│   │
+│   ├── core/              # **business logic lives here**
+│   │   ├── models/        # plain dataclasses or SQLAlchemy models
+│   │   │   ├── bin.py
+│   │   │   ├── truck.py
+│   │   │   └── depot.py
+│   │   │
+│   │   ├── services/
+│   │   │   ├── simulation_service.py   # heartbeat loop, time scaling (1×-10×)
+│   │   │   ├── traffic_service.py      # manual vs auto multiplier, stochastic generator
+│   │   │   ├── threshold_service.py    # static tables + dynamic formula
+│   │   │   ├── optimization_service.py # OR-Tools VRP + knapsack + “radar” incremental adds
+│   │   │   ├── osrm_service.py         # thin wrapper around local OSRM HTTP API
+│   │   │   └── knapsack.py             # helper (can house a fast DP impl)
+│   │   │
+│   │   └── utils/
+│   │       ├── time_manager.py         # sim-time vs real-time, pause, uptime calc
+│   │       └── geo.py                  # haversine, bounding circle, R-tree etc.
+│   │
+│   └── tasks/
+│       └── scheduler.py  # APScheduler/Celery jobs, e.g. daily reset or user-defined “collect N times”
+│
+└── tests/
+    └── … pytest or unittest suites

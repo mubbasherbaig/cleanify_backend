@@ -1,0 +1,9 @@
+"""
+Switches between STATIC and DYNAMIC modes:
+    STATIC   – returns per-bin constant
+    DYNAMIC  – f(ETA, traffic, bin_type, maybe ML later)
+"""
+class ThresholdService:
+    def __init__(self, osrm_service, traffic_service): ...
+    def set_mode(self, mode): ...
+    def threshold_for(self, bin_obj): ...
