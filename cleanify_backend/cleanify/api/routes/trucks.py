@@ -2,11 +2,12 @@
 CRUD + capacity editing for trucks.
 Keep route functions thin - delegate to services.
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.local import LocalProxy
 from typing import Dict, Any, List
 import logging
-from cleanify import simulation_service
 from cleanify.core.models.truck import Truck, TruckStatus
+simulation_service = LocalProxy(lambda: current_app.simulation_service)
 
 bp = Blueprint("trucks", __name__)
 logger = logging.getLogger(__name__)

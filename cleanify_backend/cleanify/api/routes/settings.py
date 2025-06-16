@@ -2,11 +2,12 @@
 Threshold mode, working hours, global toggles, traffic settings.
 Keep route functions thin - delegate to services.
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.local import LocalProxy
 from typing import Dict, Any, List
 import logging
 from datetime import datetime, timedelta
-from cleanify import simulation_service
+simulation_service = LocalProxy(lambda: current_app.simulation_service)
 from cleanify.core.models.bin import WasteType
 from cleanify.tasks.scheduler import schedule_collection
 

@@ -2,10 +2,11 @@
 Trigger manual optimization, return route JSON.
 Keep route functions thin - delegate to optimization service.
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.local import LocalProxy
 from typing import Dict, Any, List
 import logging
-from cleanify import simulation_service
+simulation_service = LocalProxy(lambda: current_app.simulation_service)
 from cleanify.core.models.bin import BinStatus
 
 bp = Blueprint("optimization", __name__)

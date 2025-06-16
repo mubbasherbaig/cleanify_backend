@@ -2,10 +2,11 @@
 Play / pause / speed endpoints.
 These all forward to SimulationService – keep route funcs thin.
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.local import LocalProxy
 from typing import Dict, Any
 import logging
-from cleanify import simulation_service
+simulation_service = LocalProxy(lambda: current_app.simulation_service)
 
 bp = Blueprint("simulation", __name__)
 logger = logging.getLogger(__name__)
@@ -19,8 +20,8 @@ def start():
         
         return jsonify({
             "success": True,
-            "message": f"Cleared {events_count} events",
-            "cleared_events": events_count
+            "message": "Simulation started/resumed"
+
         })
         
     except Exception as e:

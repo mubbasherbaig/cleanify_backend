@@ -92,6 +92,7 @@ class TrafficService:
         
         # Morning rush hour (7-9 AM)
         morning_start, morning_end = self.rush_hour_morning
+        evening_start, evening_end = self.rush_hour_evening
         if morning_start <= current_time_decimal <= morning_end:
             rush_intensity = self._calculate_rush_intensity(
                 current_time_decimal, morning_start, morning_end
