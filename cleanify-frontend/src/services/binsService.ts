@@ -77,7 +77,7 @@ class BinsService {
     return apiService.post('/api/bins/batch', {
       operation,
       bin_ids: binIds,
-      ...options
+      options
     });
   }
 
@@ -85,372 +85,279 @@ class BinsService {
     return this.batchOperation('collect', binIds);
   }
 
-  async batchMaintenance(binIds: string[], maintenance: boolean = true): Promise<ApiResponse> {
+  async batchMaintenance(binIds: string[], maintenance: boolean): Promise<ApiResponse> {
     return this.batchOperation('maintenance', binIds, { maintenance });
+  }
+
+  async batchUpdateCapacity(binIds: string[], capacity: number): Promise<ApiResponse> {
+    return this.batchOperation('update_capacity', binIds, { capacity });
   }
 
   async batchUpdateThreshold(binIds: string[], threshold: number): Promise<ApiResponse> {
     return this.batchOperation('update_threshold', binIds, { threshold });
   }
 
-  // Utility methods
-  async getBinsByStatus(status: BinStatus): Promise<Bin[]> {
-    try {
-      const response = await this.getBins({ status });
-      return response.bins || [];
-    } catch {
-      return [];
-    }
+  async batchDelete(binIds: string[]): Promise<ApiResponse> {
+    return this.batchOperation('delete', binIds);
   }
 
-  async getBinsByType(type: WasteType): Promise<Bin[]> {
-    try {
-      const response = await this.getBins({ type });
-      return response.bins || [];
-    } catch {
-      return [];
-    }
+  // Filtering and search
+  async searchBins(query: string): Promise<BinsListResponse> {
+    return apiService.get(`/api/bins/search?q=${encodeURIComponent(query)}`);
   }
 
-  async getActiveBins(): Promise<Bin[]> {
-    return this.getBinsByStatus(BinStatus.ACTIVE);
+  async getBinsByStatus(status: BinStatus): Promise<BinsListResponse> {
+    return this.getBins({ status });
   }
 
-  async getFullBins(): Promise<Bin[]> {
-    return this.getBinsByStatus(BinStatus.FULL);
+  async getBinsByType(type: WasteType): Promise<BinsListResponse> {
+    return this.getBins({ type });
   }
 
-  async getBinsInMaintenance(): Promise<Bin[]> {
-    return this.getBinsByStatus(BinStatus.MAINTENANCE);
+  async getBinsNeedingCollection(): Promise<BinsListResponse> {
+    return this.getBins({ needs_collection: true });
   }
 
-  async getBinsNeedingCollection(): Promise<Bin[]> {
-    try {
-      const response = await this.getBins({ needs_collection: true });
-      return response.bins || [];
-    } catch {
-      return [];
-    }
+  async getBinsByLocation(latitude: number, longitude: number, radiusKm: number): Promise<BinsListResponse> {
+    return apiService.get(`/api/bins/nearby?lat=${latitude}&lon=${longitude}&radius=${radiusKm}`);
   }
 
-  async getUrgentBins(urgencyThreshold: number = 90): Promise<Bin[]> {
-    try {
-      const response = await this.getBins();
-      return response.bins?.filter(bin => bin.fill_level >= urgencyThreshold) || [];
-    } catch {
-      return [];
-    }
+  async getBinsInBounds(northEast: [number, number], southWest: [number, number]): Promise<BinsListResponse> {
+    const [neLat, neLng] = northEast;
+    const [swLat, swLng] = southWest;
+    return apiService.get(`/api/bins/bounds?ne_lat=${neLat}&ne_lng=${neLng}&sw_lat=${swLat}&sw_lng=${swLng}`);
   }
 
-  async getBinsByPriority(priority: number): Promise<Bin[]> {
-    try {
-      const response = await this.getBins();
-      return response.bins?.filter(bin => bin.priority === priority) || [];
-    } catch {
-      return [];
-    }
+  // Capacity and fill level management
+  async updateFillLevel(binId: string, fillLevel: number): Promise<BinResponse> {
+    return apiService.patch(`/api/bins/${binId}/fill_level`, { fill_level: fillLevel });
   }
 
-  async getBinsInRange(
-    center: [number, number],
-    radiusKm: number
-  ): Promise<Bin[]> {
-    try {
-      const response = await this.getBins();
-      const bins = response.bins || [];
-      
-      return bins.filter(bin => {
-        const distance = this.calculateDistance(center, bin.location);
-        return distance <= radiusKm;
-      });
-    } catch {
-      return [];
-    }
+  async emptyBin(binId: string): Promise<BinResponse> {
+    return this.updateFillLevel(binId, 0);
   }
 
-  // Collection planning helpers
-  async getBinsForOptimization(options?: {
-    includeUrgent?: boolean;
-    includeScheduled?: boolean;
-    maxFillLevel?: number;
-    minFillLevel?: number;
-  }): Promise<Bin[]> {
-    try {
-      const response = await this.getBins();
-      let bins = response.bins || [];
-      
-      if (options?.includeUrgent) {
-        bins = bins.filter(bin => bin.needs_collection);
-      }
-      
-      if (options?.maxFillLevel !== undefined) {
-        bins = bins.filter(bin => bin.fill_level <= options.maxFillLevel!);
-      }
-      
-      if (options?.minFillLevel !== undefined) {
-        bins = bins.filter(bin => bin.fill_level >= options.minFillLevel!);
-      }
-      
-      return bins.filter(bin => bin.status === BinStatus.ACTIVE);
-    } catch {
-      return [];
-    }
+  async simulateFilling(binId: string, hours: number): Promise<BinResponse> {
+    return apiService.post(`/api/bins/${binId}/simulate_filling`, { hours });
   }
 
-  async estimateCollectionLoad(binIds: string[]): Promise<number> {
-    try {
-      const bins = await Promise.all(
-        binIds.map(id => this.getBin(id).then(r => r.bin))
-      );
-      
-      return bins.reduce((total, bin) => {
-        const binLoad = (bin.fill_level / 100) * bin.capacity;
-        return total + binLoad;
-      }, 0);
-    } catch {
-      return 0;
-    }
+  async setCapacity(binId: string, capacity: number): Promise<BinResponse> {
+    return apiService.patch(`/api/bins/${binId}/capacity`, { capacity });
   }
 
-  async calculateCollectionPriority(binId: string): Promise<number> {
-    try {
-      const response = await this.getBin(binId);
-      const bin = response.bin;
-      
-      // Priority calculation: fill level + type weight + priority multiplier
-      let priority = bin.fill_level;
-      
-      // Type weights
-      const typeWeights = {
-        [WasteType.HAZARDOUS]: 1.5,
-        [WasteType.GENERAL]: 1.0,
-        [WasteType.RECYCLABLE]: 0.8
-      };
-      
-      priority *= typeWeights[bin.type] || 1.0;
-      priority *= bin.priority * 0.5 + 0.5; // Priority 1-3 becomes 1.0-2.0 multiplier
-      
-      return Math.round(priority * 10) / 10;
-    } catch {
-      return 0;
-    }
+  async setThreshold(binId: string, threshold: number): Promise<BinResponse> {
+    return apiService.patch(`/api/bins/${binId}/threshold`, { threshold });
+  }
+
+  async setFillRate(binId: string, fillRate: number): Promise<BinResponse> {
+    return apiService.patch(`/api/bins/${binId}/fill_rate`, { fill_rate: fillRate });
+  }
+
+  // Status management
+  async setBinStatus(binId: string, status: BinStatus): Promise<BinResponse> {
+    return apiService.patch(`/api/bins/${binId}/status`, { status });
+  }
+
+  async activateBin(binId: string): Promise<BinResponse> {
+    return this.setBinStatus(binId, BinStatus.ACTIVE);
+  }
+
+  async deactivateBin(binId: string): Promise<BinResponse> {
+    return this.setBinStatus(binId, BinStatus.MAINTENANCE);
   }
 
   // Analytics and reporting
-  async getBinAnalytics(binId: string): Promise<{
-    fillTrend: number;
-    collectionFrequency: number;
-    efficiency: number;
-    recommendations: string[];
-  }> {
-    try {
-      const response = await this.getBin(binId);
-      const bin = response.bin;
-      
-      // Simple analytics - in real app this would use historical data
-      const fillTrend = bin.fill_rate; // kg/hour
-      const collectionFrequency = 7; // days (placeholder)
-      const efficiency = bin.fill_level > 80 ? 85 : 60; // percentage
-      
-      const recommendations: string[] = [];
-      
-      if (bin.fill_level > 90) {
-        recommendations.push('Schedule immediate collection');
-      }
-      
-      if (bin.fill_rate > 10) {
-        recommendations.push('Consider increasing collection frequency');
-      }
-      
-      if (bin.priority === 1 && bin.fill_level > 70) {
-        recommendations.push('Consider upgrading bin priority');
-      }
-      
-      return {
-        fillTrend,
-        collectionFrequency,
-        efficiency,
-        recommendations
-      };
-    } catch {
-      return {
-        fillTrend: 0,
-        collectionFrequency: 0,
-        efficiency: 0,
-        recommendations: []
-      };
-    }
+  async getBinAnalytics(binId: string, timeRange?: 'hour' | 'day' | 'week' | 'month'): Promise<ApiResponse> {
+    const params = timeRange ? `?time_range=${timeRange}` : '';
+    return apiService.get(`/api/bins/${binId}/analytics${params}`);
   }
 
-  async getDistributionAnalysis(): Promise<{
-    byType: Record<WasteType, number>;
-    byStatus: Record<BinStatus, number>;
-    byPriority: Record<number, number>;
-    byFillLevel: { low: number; medium: number; high: number; full: number };
-  }> {
-    try {
-      const response = await this.getBins();
-      const bins = response.bins || [];
-      
-      const byType: Record<WasteType, number> = {
-        [WasteType.GENERAL]: 0,
-        [WasteType.RECYCLABLE]: 0,
-        [WasteType.HAZARDOUS]: 0
-      };
-      
-      const byStatus: Record<BinStatus, number> = {
-        [BinStatus.ACTIVE]: 0,
-        [BinStatus.FULL]: 0,
-        [BinStatus.MAINTENANCE]: 0,
-        [BinStatus.COLLECTED]: 0
-      };
-      
-      const byPriority: Record<number, number> = { 1: 0, 2: 0, 3: 0 };
-      const byFillLevel = { low: 0, medium: 0, high: 0, full: 0 };
-      
-      bins.forEach(bin => {
-        byType[bin.type]++;
-        byStatus[bin.status]++;
-        byPriority[bin.priority]++;
-        
-        if (bin.fill_level >= 100) {
-          byFillLevel.full++;
-        } else if (bin.fill_level >= 80) {
-          byFillLevel.high++;
-        } else if (bin.fill_level >= 50) {
-          byFillLevel.medium++;
-        } else {
-          byFillLevel.low++;
+  async getBinHistory(binId: string, limit?: number): Promise<ApiResponse> {
+    const params = limit ? `?limit=${limit}` : '';
+    return apiService.get(`/api/bins/${binId}/history${params}`);
+  }
+
+  async getBinCollectionHistory(binId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/bins/${binId}/collections`);
+  }
+
+  async generateBinReport(binIds?: string[], timeRange?: string): Promise<ApiResponse> {
+    return apiService.post('/api/bins/report', {
+      bin_ids: binIds,
+      time_range: timeRange
+    });
+  }
+
+  // Optimization helpers
+  async getOptimizationCandidates(): Promise<BinsListResponse> {
+    return apiService.get('/api/bins/optimization_candidates');
+  }
+
+  async getBinsForRoute(): Promise<BinsListResponse> {
+    return apiService.get('/api/bins/route_candidates');
+  }
+
+  async getUrgentBins(): Promise<BinsListResponse> {
+    return apiService.get('/api/bins/urgent');
+  }
+
+  async getBinsPrioritized(): Promise<BinsListResponse> {
+    return apiService.get('/api/bins/prioritized');
+  }
+
+  // Location and mapping
+  async updateBinLocation(binId: string, latitude: number, longitude: number): Promise<BinResponse> {
+    return apiService.patch(`/api/bins/${binId}/location`, {
+      location: [longitude, latitude]
+    });
+  }
+
+  async getBinClusters(zoomLevel: number): Promise<ApiResponse> {
+    return apiService.get(`/api/bins/clusters?zoom=${zoomLevel}`);
+  }
+
+  async getBinHeatmapData(): Promise<ApiResponse> {
+    return apiService.get('/api/bins/heatmap');
+  }
+
+  // Alerts and notifications
+  async getBinAlerts(binId?: string): Promise<ApiResponse> {
+    const endpoint = binId ? `/api/bins/${binId}/alerts` : '/api/bins/alerts';
+    return apiService.get(endpoint);
+  }
+
+  async acknowledgeAlert(alertId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/bins/alerts/${alertId}/acknowledge`);
+  }
+
+  async dismissAlert(alertId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/bins/alerts/${alertId}/dismiss`);
+  }
+
+  // Import/Export
+  async exportBins(format: 'csv' | 'json' | 'excel' = 'csv'): Promise<ApiResponse> {
+    return apiService.get(`/api/bins/export?format=${format}`);
+  }
+
+  async importBins(file: File, format: 'csv' | 'json' | 'excel'): Promise<ApiResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('format', format);
+
+    return apiService.post('/api/bins/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  }
+
+  // Validation and testing
+  async validateBinData(binData: BinFormData): Promise<ApiResponse> {
+    return apiService.post('/api/bins/validate', binData);
+  }
+
+  async testBinFilling(binId: string, scenario: 'normal' | 'high' | 'low'): Promise<ApiResponse> {
+    return apiService.post(`/api/bins/${binId}/test_filling`, { scenario });
+  }
+
+  async simulateOverflow(binId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/bins/${binId}/simulate_overflow`);
+  }
+
+  // Utility methods
+  async getNearestBin(latitude: number, longitude: number, type?: WasteType): Promise<BinResponse> {
+    const params = new URLSearchParams({
+      lat: latitude.toString(),
+      lon: longitude.toString()
+    });
+
+    if (type) {
+      params.append('type', type);
+    }
+
+    return apiService.get(`/api/bins/nearest?${params}`);
+  }
+
+  async getBinCapacityUtilization(): Promise<ApiResponse> {
+    return apiService.get('/api/bins/capacity_utilization');
+  }
+
+  async getBinFillRateAnalysis(): Promise<ApiResponse> {
+    return apiService.get('/api/bins/fill_rate_analysis');
+  }
+
+  async getCollectionEfficiency(): Promise<ApiResponse> {
+    return apiService.get('/api/bins/collection_efficiency');
+  }
+
+  async getThresholdRecommendations(binId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/bins/${binId}/threshold_recommendations`);
+  }
+
+  // Real-time helpers
+  async subscribeToBinUpdates(binId: string, callback: (bin: Bin) => void): Promise<() => void> {
+    // This would typically use WebSocket or Server-Sent Events
+    // For now, we'll simulate with polling
+    const interval = setInterval(async () => {
+      try {
+        const response = await this.getBin(binId);
+        if (response.success && response.bin) {
+          callback(response.bin);
         }
-      });
-      
-      return { byType, byStatus, byPriority, byFillLevel };
-    } catch {
-      return {
-        byType: { [WasteType.GENERAL]: 0, [WasteType.RECYCLABLE]: 0, [WasteType.HAZARDOUS]: 0 },
-        byStatus: { [BinStatus.ACTIVE]: 0, [BinStatus.FULL]: 0, [BinStatus.MAINTENANCE]: 0, [BinStatus.COLLECTED]: 0 },
-        byPriority: { 1: 0, 2: 0, 3: 0 },
-        byFillLevel: { low: 0, medium: 0, high: 0, full: 0 }
-      };
-    }
+      } catch (error) {
+        console.error('Error fetching bin updates:', error);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
   }
 
-  // Utility calculations
-  private calculateDistance(coord1: [number, number], coord2: [number, number]): number {
-    const [lon1, lat1] = coord1;
-    const [lon2, lat2] = coord2;
-    
-    const R = 6371; // Earth's radius in km
-    const dLat = this.toRad(lat2 - lat1);
-    const dLon = this.toRad(lon2 - lon1);
-    
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    
-    return R * c;
+  // Bulk operations for performance
+  async bulkCreateBins(bins: BinFormData[]): Promise<ApiResponse> {
+    return apiService.post('/api/bins/bulk_create', { bins });
   }
 
-  private toRad(value: number): number {
-    return value * Math.PI / 180;
+  async bulkUpdateBins(updates: Array<{ id: string; data: Partial<BinFormData> }>): Promise<ApiResponse> {
+    return apiService.post('/api/bins/bulk_update', { updates });
   }
 
-  // Validation helpers
-  validateBinData(data: Partial<BinFormData>): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (data.id && data.id.trim().length === 0) {
-      errors.push('Bin ID is required');
-    }
-
-    if (data.type && !Object.values(WasteType).includes(data.type)) {
-      errors.push('Invalid waste type');
-    }
-
-    if (data.location && data.location.length !== 2) {
-      errors.push('Location must be [longitude, latitude]');
-    }
-
-    if (data.static_threshold !== undefined && (data.static_threshold < 0 || data.static_threshold > 100)) {
-      errors.push('Threshold must be between 0 and 100');
-    }
-
-    if (data.fill_level !== undefined && (data.fill_level < 0 || data.fill_level > 100)) {
-      errors.push('Fill level must be between 0 and 100');
-    }
-
-    if (data.capacity !== undefined && data.capacity <= 0) {
-      errors.push('Capacity must be greater than 0');
-    }
-
-    if (data.fill_rate !== undefined && data.fill_rate < 0) {
-      errors.push('Fill rate cannot be negative');
-    }
-
-    if (data.priority !== undefined && ![1, 2, 3].includes(data.priority)) {
-      errors.push('Priority must be 1, 2, or 3');
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+  // Geographic analysis
+  async getCollectionDensity(): Promise<ApiResponse> {
+    return apiService.get('/api/bins/collection_density');
   }
 
-  // Search and filtering
-  async searchBins(query: string): Promise<Bin[]> {
-    try {
-      const response = await this.getBins();
-      const bins = response.bins || [];
-      
-      const lowerQuery = query.toLowerCase();
-      
-      return bins.filter(bin => 
-        bin.id.toLowerCase().includes(lowerQuery) ||
-        bin.type.toLowerCase().includes(lowerQuery) ||
-        bin.status.toLowerCase().includes(lowerQuery)
-      );
-    } catch {
-      return [];
-    }
+  async getOptimalBinPlacements(count: number): Promise<ApiResponse> {
+    return apiService.post('/api/bins/optimal_placements', { count });
   }
 
-  async filterBins(filters: BinFilters): Promise<Bin[]> {
-    try {
-      const response = await this.getBins();
-      let bins = response.bins || [];
-      
-      if (filters.status) {
-        bins = bins.filter(bin => bin.status === filters.status);
-      }
-      
-      if (filters.type) {
-        bins = bins.filter(bin => bin.type === filters.type);
-      }
-      
-      if (filters.priority) {
-        bins = bins.filter(bin => bin.priority === filters.priority);
-      }
-      
-      if (filters.needs_collection) {
-        bins = bins.filter(bin => bin.needs_collection);
-      }
-      
-      if (filters.fill_level_min !== undefined) {
-        bins = bins.filter(bin => bin.fill_level >= filters.fill_level_min!);
-      }
-      
-      if (filters.fill_level_max !== undefined) {
-        bins = bins.filter(bin => bin.fill_level <= filters.fill_level_max!);
-      }
-      
-      return bins;
-    } catch {
-      return [];
-    }
+  async analyzeCoverage(): Promise<ApiResponse> {
+    return apiService.get('/api/bins/coverage_analysis');
+  }
+
+  // Performance metrics
+  async getBinPerformanceMetrics(binId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/bins/${binId}/performance`);
+  }
+
+  async comparePerformance(binIds: string[]): Promise<ApiResponse> {
+    return apiService.post('/api/bins/compare_performance', { bin_ids: binIds });
+  }
+
+  async getBenchmarkData(): Promise<ApiResponse> {
+    return apiService.get('/api/bins/benchmarks');
+  }
+
+  // Predictive analytics
+  async predictFillLevel(binId: string, hours: number): Promise<ApiResponse> {
+    return apiService.post(`/api/bins/${binId}/predict_fill`, { hours });
+  }
+
+  async predictOverflow(binId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/bins/${binId}/predict_overflow`);
+  }
+
+  async getMaintenancePredictions(): Promise<ApiResponse> {
+    return apiService.get('/api/bins/maintenance_predictions');
   }
 }
 

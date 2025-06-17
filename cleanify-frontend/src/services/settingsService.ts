@@ -138,365 +138,337 @@ class SettingsService {
   }
 
   // Utility methods
-  async setTrafficMode(mode: 'auto' | 'manual', multiplier?: number): Promise<ApiResponse> {
+  async setTrafficMode(mode: 'auto' | 'manual', multiplier?: number): Promise<SettingsUpdateResponse> {
     const settings: any = { mode };
-    
     if (mode === 'manual' && multiplier !== undefined) {
       settings.manual_multiplier = multiplier;
     }
-    
     return this.updateTrafficSettings(settings);
   }
 
-  async setThresholdMode(mode: 'static' | 'dynamic'): Promise<ApiResponse> {
+  async setThresholdMode(mode: 'static' | 'dynamic'): Promise<SettingsUpdateResponse> {
     return this.updateThresholdSettings({ mode });
   }
 
-  async updateStaticThresholds(thresholds: Record<WasteType, number>): Promise<ApiResponse> {
-    const thresholdMap: Record<string, number> = {};
+  async updateStaticThreshold(wasteType: WasteType, threshold: number): Promise<SettingsUpdateResponse> {
+    const current = await this.getThresholdSettings();
+    const staticThresholds = current.data?.static_thresholds || {};
     
-    Object.entries(thresholds).forEach(([type, value]) => {
-      thresholdMap[type] = value;
-    });
+    staticThresholds[wasteType] = threshold;
     
     return this.updateThresholdSettings({
-      static_thresholds: thresholdMap
+      static_thresholds: staticThresholds
     });
   }
 
-  async updateDynamicThresholdConfig(config: Partial<DynamicThresholdConfig>): Promise<ApiResponse> {
+  async updateDynamicThresholdConfig(config: Partial<DynamicThresholdConfig>): Promise<SettingsUpdateResponse> {
     return this.updateThresholdSettings({
       dynamic_config: config
     });
   }
 
-  // Presets and quick actions
-  async applyQuickPreset(preset: 'efficient' | 'conservative' | 'balanced'): Promise<ApiResponse> {
-    const presets = {
-      efficient: {
-        simulation: {
-          auto_optimization: true,
-          auto_bin_filling: true,
-          truck_breakdown_probability: 0.0005,
-          emit_frequency: 2
-        },
-        traffic: {
-          mode: 'auto'
-        },
-        threshold: {
-          mode: 'dynamic',
-          static_thresholds: {
-            general: 85,
-            recyclable: 90,
-            hazardous: 65
-          }
-        },
-        scheduler: {
-          collections_per_day: 3,
-          working_hours: [6, 20]
-        }
-      },
-      conservative: {
-        simulation: {
-          auto_optimization: true,
-          auto_bin_filling: true,
-          truck_breakdown_probability: 0.002,
-          emit_frequency: 1
-        },
-        traffic: {
-          mode: 'manual',
-          manual_multiplier: 1.2
-        },
-        threshold: {
-          mode: 'static',
-          static_thresholds: {
-            general: 70,
-            recyclable: 75,
-            hazardous: 60
-          }
-        },
-        scheduler: {
-          collections_per_day: 4,
-          working_hours: [7, 19]
-        }
-      },
-      balanced: {
-        simulation: {
-          auto_optimization: true,
-          auto_bin_filling: true,
-          truck_breakdown_probability: 0.001,
-          emit_frequency: 1
-        },
-        traffic: {
-          mode: 'auto'
-        },
-        threshold: {
-          mode: 'static',
-          static_thresholds: {
-            general: 80,
-            recyclable: 85,
-            hazardous: 70
-          }
-        },
-        scheduler: {
-          collections_per_day: 2,
-          working_hours: [8, 18]
-        }
-      }
-    };
-
-    const presetData = presets[preset];
+  // Simulation control helpers
+  async toggleAutoOptimization(): Promise<SettingsUpdateResponse> {
+    const current = await this.getSimulationSettings();
+    const autoOptimization = !current.data?.auto_optimization;
     
-    // Apply each setting category
-    const results = await Promise.allSettled([
-      this.updateSimulationSettings(presetData.simulation),
-      this.updateTrafficSettings(presetData.traffic),
-      this.updateThresholdSettings(presetData.threshold),
-      this.updateSchedulerSettings(presetData.scheduler)
-    ]);
+    return this.updateSimulationSettings({
+      auto_optimization: autoOptimization
+    });
+  }
 
-    const failures = results.filter(r => r.status === 'rejected');
+  async toggleAutoBinFilling(): Promise<SettingsUpdateResponse> {
+    const current = await this.getSimulationSettings();
+    const autoBinFilling = !current.data?.auto_bin_filling;
     
-    if (failures.length > 0) {
-      return {
-        success: false,
-        error: `Failed to apply some preset settings: ${failures.length} failures`
-      };
-    }
-
-    return {
-      success: true,
-      message: `Applied ${preset} preset successfully`
-    };
-  }
-
-  // Configuration helpers
-  async enableAutoOptimization(): Promise<ApiResponse> {
     return this.updateSimulationSettings({
-      config: { auto_optimization: true }
+      auto_bin_filling: autoBinFilling
     });
   }
 
-  async disableAutoOptimization(): Promise<ApiResponse> {
+  async setEmitFrequency(frequency: number): Promise<SettingsUpdateResponse> {
     return this.updateSimulationSettings({
-      config: { auto_optimization: false }
+      emit_frequency: Math.max(1, Math.min(10, frequency))
     });
   }
 
-  async setEmitFrequency(frequency: number): Promise<ApiResponse> {
+  async setTruckBreakdownProbability(probability: number): Promise<SettingsUpdateResponse> {
     return this.updateSimulationSettings({
-      config: { emit_frequency: frequency }
+      truck_breakdown_probability: Math.max(0, Math.min(1, probability))
     });
   }
 
-  async setTruckBreakdownProbability(probability: number): Promise<ApiResponse> {
-    return this.updateSimulationSettings({
-      config: { truck_breakdown_probability: probability }
+  // Optimization control helpers
+  async setVRPTimeLimit(seconds: number): Promise<SettingsUpdateResponse> {
+    return this.updateOptimizationSettings({
+      vrp_time_limit_seconds: Math.max(1, seconds)
     });
   }
 
-  // Traffic management helpers
-  async createTrafficEvent(
-    startTime: Date,
-    endTime: Date,
-    multiplierDelta: number,
-    description: string
-  ): Promise<ApiResponse> {
+  async setKnapsackTimeLimit(seconds: number): Promise<SettingsUpdateResponse> {
+    return this.updateOptimizationSettings({
+      knapsack_time_limit_seconds: Math.max(1, seconds)
+    });
+  }
+
+  async setMaxRouteDistance(km: number): Promise<SettingsUpdateResponse> {
+    return this.updateOptimizationSettings({
+      max_route_distance_km: Math.max(1, km)
+    });
+  }
+
+  async setMaxRouteDuration(minutes: number): Promise<SettingsUpdateResponse> {
+    return this.updateOptimizationSettings({
+      max_route_duration_minutes: Math.max(1, minutes)
+    });
+  }
+
+  async setOptimizationAlgorithm(algorithm: 'greedy' | 'guided_local_search' | 'auto'): Promise<SettingsUpdateResponse> {
+    return this.updateOptimizationSettings({
+      optimization_algorithm: algorithm
+    });
+  }
+
+  async setUrgencyThreshold(threshold: number): Promise<SettingsUpdateResponse> {
+    return this.updateOptimizationSettings({
+      urgency_threshold: Math.max(0, Math.min(100, threshold))
+    });
+  }
+
+  async setRadarCheckInterval(minutes: number): Promise<SettingsUpdateResponse> {
+    return this.updateOptimizationSettings({
+      radar_check_interval_minutes: Math.max(1, minutes)
+    });
+  }
+
+  // Traffic pattern helpers
+  async updateTrafficPatterns(patterns: Partial<TrafficPatterns>): Promise<SettingsUpdateResponse> {
+    return this.updateTrafficSettings({ patterns });
+  }
+
+  async addCustomTrafficEvent(event: {
+    name: string;
+    start_time: string;
+    end_time: string;
+    multiplier: number;
+    description?: string;
+  }): Promise<ApiResponse> {
     return this.addTrafficEvent({
-      start_time: startTime.toISOString(),
-      end_time: endTime.toISOString(),
-      multiplier_delta: multiplierDelta,
-      description
+      ...event,
+      type: 'custom',
+      id: `custom_${Date.now()}`
     });
   }
 
-  async createRushHourEvent(
-    date: Date,
-    type: 'morning' | 'evening'
-  ): Promise<ApiResponse> {
-    const isEvening = type === 'evening';
-    const startHour = isEvening ? 17 : 7;
-    const endHour = isEvening ? 19 : 9;
-    
-    const startTime = new Date(date);
-    startTime.setHours(startHour, 0, 0, 0);
-    
-    const endTime = new Date(date);
-    endTime.setHours(endHour, 0, 0, 0);
-    
-    return this.createTrafficEvent(
-      startTime,
-      endTime,
-      isEvening ? 0.8 : 0.6, // Evening rush is typically heavier
-      `${type.charAt(0).toUpperCase() + type.slice(1)} rush hour`
-    );
-  }
-
-  // Bulk operations
-  async updateMultipleSettings(updates: {
+  // Batch operations
+  async batchUpdateSettings(updates: {
     simulation?: any;
     traffic?: any;
     threshold?: any;
     optimization?: any;
     scheduler?: any;
-  }): Promise<{ success: boolean; results: any[] }> {
-    const operations = [];
-    
-    if (updates.simulation) {
-      operations.push(['simulation', this.updateSimulationSettings(updates.simulation)]);
-    }
-    
-    if (updates.traffic) {
-      operations.push(['traffic', this.updateTrafficSettings(updates.traffic)]);
-    }
-    
-    if (updates.threshold) {
-      operations.push(['threshold', this.updateThresholdSettings(updates.threshold)]);
-    }
-    
-    if (updates.optimization) {
-      operations.push(['optimization', this.updateOptimizationSettings(updates.optimization)]);
-    }
-    
-    if (updates.scheduler) {
-      operations.push(['scheduler', this.updateSchedulerSettings(updates.scheduler)]);
-    }
+  }): Promise<{
+    results: Record<string, SettingsUpdateResponse>;
+    success: boolean;
+    errors: string[];
+  }> {
+    const results: Record<string, SettingsUpdateResponse> = {};
+    const errors: string[] = [];
 
-    const results = await Promise.allSettled(
-      operations.map(([_, promise]) => promise)
-    );
+    try {
+      if (updates.simulation) {
+        results.simulation = await this.updateSimulationSettings(updates.simulation);
+        if (!results.simulation.success) {
+          errors.push(`Simulation: ${results.simulation.error}`);
+        }
+      }
 
-    const successCount = results.filter(r => r.status === 'fulfilled').length;
-    
-    return {
-      success: successCount === operations.length,
-      results: results.map((result, index) => ({
-        category: operations[index][0],
-        success: result.status === 'fulfilled',
-        error: result.status === 'rejected' ? result.reason : undefined
-      }))
-    };
+      if (updates.traffic) {
+        results.traffic = await this.updateTrafficSettings(updates.traffic);
+        if (!results.traffic.success) {
+          errors.push(`Traffic: ${results.traffic.error}`);
+        }
+      }
+
+      if (updates.threshold) {
+        results.threshold = await this.updateThresholdSettings(updates.threshold);
+        if (!results.threshold.success) {
+          errors.push(`Threshold: ${results.threshold.error}`);
+        }
+      }
+
+      if (updates.optimization) {
+        results.optimization = await this.updateOptimizationSettings(updates.optimization);
+        if (!results.optimization.success) {
+          errors.push(`Optimization: ${results.optimization.error}`);
+        }
+      }
+
+      if (updates.scheduler) {
+        results.scheduler = await this.updateSchedulerSettings(updates.scheduler);
+        if (!results.scheduler.success) {
+          errors.push(`Scheduler: ${results.scheduler.error}`);
+        }
+      }
+
+      return {
+        results,
+        success: errors.length === 0,
+        errors
+      };
+    } catch (error) {
+      errors.push(`Batch update failed: ${error}`);
+      return {
+        results,
+        success: false,
+        errors
+      };
+    }
   }
 
   // Settings comparison and diff
-  async compareWithDefaults(): Promise<{
-    differences: Array<{
-      category: string;
-      setting: string;
-      current: any;
-      default: any;
-    }>;
-    identical: boolean;
+  async compareSettings(settingsA: AllSettings, settingsB: AllSettings): Promise<{
+    differences: Record<string, any>;
+    hasChanges: boolean;
   }> {
-    try {
-      const current = await this.getAllSettings();
-      
-      // This would compare with default settings
-      // For now, return empty differences
-      return {
-        differences: [],
-        identical: true
-      };
-    } catch {
-      return {
-        differences: [],
-        identical: false
-      };
-    }
-  }
+    const differences: Record<string, any> = {};
+    let hasChanges = false;
 
-  async getSettingsSummary(): Promise<{
-    traffic_mode: string;
-    threshold_mode: string;
-    auto_optimization: boolean;
-    collections_per_day: number;
-    working_hours: string;
-    last_modified: string | null;
-  }> {
-    try {
-      const settings = await this.getAllSettings();
-      
-      if (!settings.success) {
-        throw new Error('Failed to get settings');
+    // Helper function to deeply compare objects
+    const findDifferences = (objA: any, objB: any, path: string = '') => {
+      if (typeof objA !== typeof objB) {
+        differences[path] = { from: objA, to: objB };
+        hasChanges = true;
+        return;
       }
 
-      return {
-        traffic_mode: settings.settings.traffic.mode,
-        threshold_mode: settings.settings.threshold.mode,
-        auto_optimization: settings.settings.simulation.config.auto_optimization,
-        collections_per_day: settings.settings.scheduler.collections_per_day,
-        working_hours: `${settings.settings.scheduler.working_hours[0]}:00 - ${settings.settings.scheduler.working_hours[1]}:00`,
-        last_modified: null // Would track this in real implementation
-      };
-    } catch {
-      return {
-        traffic_mode: 'unknown',
-        threshold_mode: 'unknown',
-        auto_optimization: false,
-        collections_per_day: 0,
-        working_hours: 'unknown',
-        last_modified: null
-      };
-    }
-  }
-
-  // Validation helpers
-  validateTrafficSettings(settings: any): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (settings.mode && !['auto', 'manual'].includes(settings.mode)) {
-      errors.push('Traffic mode must be "auto" or "manual"');
-    }
-
-    if (settings.manual_multiplier !== undefined) {
-      if (typeof settings.manual_multiplier !== 'number' || 
-          settings.manual_multiplier < 1.0 || 
-          settings.manual_multiplier > 2.0) {
-        errors.push('Manual multiplier must be between 1.0 and 2.0');
-      }
-    }
-
-    return { valid: errors.length === 0, errors };
-  }
-
-  validateThresholdSettings(settings: any): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (settings.mode && !['static', 'dynamic'].includes(settings.mode)) {
-      errors.push('Threshold mode must be "static" or "dynamic"');
-    }
-
-    if (settings.static_thresholds) {
-      Object.entries(settings.static_thresholds).forEach(([type, threshold]) => {
-        if (typeof threshold !== 'number' || threshold < 0 || threshold > 100) {
-          errors.push(`Threshold for ${type} must be between 0 and 100`);
+      if (typeof objA === 'object' && objA !== null) {
+        const allKeys = new Set([...Object.keys(objA), ...Object.keys(objB)]);
+        
+        for (const key of allKeys) {
+          const newPath = path ? `${path}.${key}` : key;
+          
+          if (!(key in objA)) {
+            differences[newPath] = { from: undefined, to: objB[key] };
+            hasChanges = true;
+          } else if (!(key in objB)) {
+            differences[newPath] = { from: objA[key], to: undefined };
+            hasChanges = true;
+          } else {
+            findDifferences(objA[key], objB[key], newPath);
+          }
         }
-      });
-    }
+      } else if (objA !== objB) {
+        differences[path] = { from: objA, to: objB };
+        hasChanges = true;
+      }
+    };
 
-    return { valid: errors.length === 0, errors };
+    findDifferences(settingsA, settingsB);
+
+    return { differences, hasChanges };
   }
 
-  validateSchedulerSettings(settings: any): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (settings.collections_per_day !== undefined) {
-      if (!Number.isInteger(settings.collections_per_day) || 
-          settings.collections_per_day < 1 || 
-          settings.collections_per_day > 10) {
-        errors.push('Collections per day must be between 1 and 10');
+  // Settings backup and restore
+  async createBackup(name?: string): Promise<ApiResponse & { backup_id?: string }> {
+    try {
+      const export_result = await this.exportSettings();
+      
+      if (!export_result.success) {
+        return export_result;
       }
-    }
 
-    if (settings.working_hours) {
-      const [start, end] = settings.working_hours;
-      if (!Number.isInteger(start) || !Number.isInteger(end) ||
-          start < 0 || start > 23 || end < 1 || end > 24 || start >= end) {
-        errors.push('Invalid working hours');
+      const backup_id = `backup_${Date.now()}`;
+      const backup_name = name || `Settings Backup ${new Date().toLocaleString()}`;
+
+      // Store backup in localStorage (in a real app, this would be sent to server)
+      const backups = JSON.parse(localStorage.getItem('settings_backups') || '{}');
+      backups[backup_id] = {
+        name: backup_name,
+        timestamp: new Date().toISOString(),
+        data: export_result.export_data
+      };
+      localStorage.setItem('settings_backups', JSON.stringify(backups));
+
+      return {
+        success: true,
+        message: 'Settings backup created successfully',
+        backup_id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to create backup: ${error}`
+      };
+    }
+  }
+
+  async listBackups(): Promise<ApiResponse & { backups?: Array<{ id: string; name: string; timestamp: string }> }> {
+    try {
+      const backups = JSON.parse(localStorage.getItem('settings_backups') || '{}');
+      
+      const backup_list = Object.entries(backups).map(([id, backup]: [string, any]) => ({
+        id,
+        name: backup.name,
+        timestamp: backup.timestamp
+      }));
+
+      return {
+        success: true,
+        backups: backup_list
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to list backups: ${error}`
+      };
+    }
+  }
+
+  async restoreBackup(backup_id: string): Promise<ApiResponse> {
+    try {
+      const backups = JSON.parse(localStorage.getItem('settings_backups') || '{}');
+      
+      if (!backups[backup_id]) {
+        return {
+          success: false,
+          error: 'Backup not found'
+        };
       }
-    }
 
-    return { valid: errors.length === 0, errors };
+      return this.importSettings(backups[backup_id].data);
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to restore backup: ${error}`
+      };
+    }
+  }
+
+  async deleteBackup(backup_id: string): Promise<ApiResponse> {
+    try {
+      const backups = JSON.parse(localStorage.getItem('settings_backups') || '{}');
+      
+      if (!backups[backup_id]) {
+        return {
+          success: false,
+          error: 'Backup not found'
+        };
+      }
+
+      delete backups[backup_id];
+      localStorage.setItem('settings_backups', JSON.stringify(backups));
+
+      return {
+        success: true,
+        message: 'Backup deleted successfully'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to delete backup: ${error}`
+      };
+    }
   }
 }
 

@@ -107,193 +107,467 @@ class SimulationService {
     reset_trucks?: boolean;
     reset_bins?: boolean;
     reset_optimization?: boolean;
+    reset_statistics?: boolean;
   }): Promise<ApiResponse> {
     return apiService.post('/api/simulation/reset', options || {});
   }
 
-  // Utility methods for common operations
-  async togglePause(): Promise<ApiResponse> {
-    const status = await this.getStatus();
-    
-    if (status.status.is_paused) {
-      return this.start();
-    } else {
-      return this.pause();
-    }
+  async restart(): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/restart');
   }
 
-  async adjustSpeed(delta: number): Promise<ApiResponse> {
-    const status = await this.getStatus();
-    const newSpeed = Math.max(1, Math.min(10, status.status.speed + delta));
-    return this.setSpeed(newSpeed);
+  async hardReset(): Promise<ApiResponse> {
+    return this.reset({
+      reset_trucks: true,
+      reset_bins: true,
+      reset_optimization: true,
+      reset_statistics: true
+    });
   }
 
-  async skipTime(minutes: number): Promise<ApiResponse> {
-    return this.fastForward({ minutes });
+  // Advanced control methods
+  async stepForward(steps: number = 1): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/step', { steps });
   }
 
-  // Monitoring helpers
+  async stepBackward(steps: number = 1): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/step_back', { steps });
+  }
+
+  async setSpeedMultiplier(multiplier: number): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/speed_multiplier', { multiplier });
+  }
+
+  async enableDebugMode(enabled: boolean = true): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/debug', { enabled });
+  }
+
+  // Traffic management
+  async getTrafficStatus(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/traffic');
+  }
+
+  async setTrafficMultiplier(multiplier: number): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/traffic', { multiplier });
+  }
+
+  async addTrafficEvent(event: {
+    name: string;
+    multiplier: number;
+    start_time: string;
+    duration_minutes: number;
+    location?: { latitude: number; longitude: number; radius?: number };
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/traffic/events', event);
+  }
+
+  async removeTrafficEvent(eventId: string): Promise<ApiResponse> {
+    return apiService.delete(`/api/simulation/traffic/events/${eventId}`);
+  }
+
+  async clearTrafficEvents(): Promise<ApiResponse> {
+    return apiService.delete('/api/simulation/traffic/events');
+  }
+
+  // Scenario management
+  async loadScenario(scenarioName: string): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/scenarios/load', { scenario: scenarioName });
+  }
+
+  async saveScenario(scenarioName: string, description?: string): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/scenarios/save', {
+      name: scenarioName,
+      description
+    });
+  }
+
+  async listScenarios(): Promise<ApiResponse<{ scenarios: Array<{ name: string; description: string; created_at: string }> }>> {
+    return apiService.get('/api/simulation/scenarios');
+  }
+
+  async deleteScenario(scenarioName: string): Promise<ApiResponse> {
+    return apiService.delete(`/api/simulation/scenarios/${scenarioName}`);
+  }
+
+  // Recording and playback
+  async startRecording(recordingName?: string): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/recording/start', {
+      name: recordingName || `recording_${Date.now()}`
+    });
+  }
+
+  async stopRecording(): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/recording/stop');
+  }
+
+  async playRecording(recordingId: string, speed?: number): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/recording/play', {
+      recording_id: recordingId,
+      speed: speed || 1
+    });
+  }
+
+  async listRecordings(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/recordings');
+  }
+
+  async deleteRecording(recordingId: string): Promise<ApiResponse> {
+    return apiService.delete(`/api/simulation/recordings/${recordingId}`);
+  }
+
+  // Simulation state management
+  async saveState(stateName: string): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/state/save', { name: stateName });
+  }
+
+  async loadState(stateName: string): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/state/load', { name: stateName });
+  }
+
+  async listSavedStates(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/state/list');
+  }
+
+  async deleteState(stateName: string): Promise<ApiResponse> {
+    return apiService.delete(`/api/simulation/state/${stateName}`);
+  }
+
+  // Benchmarking and testing
+  async runBenchmark(benchmarkConfig?: {
+    duration_minutes?: number;
+    truck_count?: number;
+    bin_count?: number;
+    optimization_enabled?: boolean;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/benchmark', benchmarkConfig || {});
+  }
+
+  async runStressTest(testConfig?: {
+    max_trucks?: number;
+    max_bins?: number;
+    duration_minutes?: number;
+    ramp_up_minutes?: number;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/stress_test', testConfig || {});
+  }
+
+  async validateConfiguration(): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/validate');
+  }
+
+  // Data export and analysis
+  async exportSimulationData(format: 'csv' | 'json' | 'excel' = 'json'): Promise<ApiResponse> {
+    return apiService.get(`/api/simulation/export?format=${format}`);
+  }
+
+  async exportTelemetry(timeRange?: {
+    start: string;
+    end: string;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/telemetry/export', timeRange);
+  }
+
+  async generateReport(reportType: 'summary' | 'detailed' | 'performance' = 'summary'): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/report', { type: reportType });
+  }
+
+  // Real-time monitoring
+  async subscribeToUpdates(callback: (update: any) => void): Promise<() => void> {
+    // This would typically use WebSocket
+    const interval = setInterval(async () => {
+      try {
+        const status = await this.getStatus();
+        if (status.success) {
+          callback(status.status);
+        }
+      } catch (error) {
+        console.error('Error fetching simulation updates:', error);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }
+
+  async getRealtimeMetrics(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/realtime/metrics');
+  }
+
+  async setMetricsInterval(intervalMs: number): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/realtime/interval', { interval: intervalMs });
+  }
+
+  // Error handling and diagnostics
+  async getDiagnostics(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/diagnostics');
+  }
+
+  async getErrorLog(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/errors');
+  }
+
+  async clearErrors(): Promise<ApiResponse> {
+    return apiService.delete('/api/simulation/errors');
+  }
+
+  async testConnectivity(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/ping');
+  }
+
+  // Utilities and helpers
   async isRunning(): Promise<boolean> {
     try {
       const status = await this.getStatus();
-      return status.status.is_running && !status.status.is_paused;
+      return status.success && status.status?.is_running;
     } catch {
       return false;
+    }
+  }
+
+  async isPaused(): Promise<boolean> {
+    try {
+      const status = await this.getStatus();
+      return status.success && status.status?.is_paused;
+    } catch {
+      return false;
+    }
+  }
+
+  async getCurrentTime(): Promise<string | null> {
+    try {
+      const timeInfo = await this.getTimeInfo();
+      return timeInfo.success ? timeInfo.data?.current_time : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getCurrentSpeed(): Promise<number> {
+    try {
+      const status = await this.getStatus();
+      return status.success ? status.status?.speed || 1 : 1;
+    } catch {
+      return 1;
     }
   }
 
   async getUptime(): Promise<number> {
     try {
       const status = await this.getStatus();
-      return status.status.uptime_seconds;
+      return status.success ? status.status?.uptime_seconds || 0 : 0;
     } catch {
       return 0;
     }
   }
 
-  async getCurrentTime(): Promise<string | null> {
+  // Preset operations
+  async applyPreset(presetName: 'demo' | 'stress' | 'minimal' | 'comprehensive'): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/presets/apply', { preset: presetName });
+  }
+
+  async listPresets(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/presets');
+  }
+
+  async createCustomPreset(preset: {
+    name: string;
+    description?: string;
+    config: Partial<SimulationConfig>;
+    truck_count?: number;
+    bin_count?: number;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/presets/custom', preset);
+  }
+
+  // Automation and scheduling
+  async scheduleStart(startTime: string): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/schedule/start', { start_time: startTime });
+  }
+
+  async scheduleStop(stopTime: string): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/schedule/stop', { stop_time: stopTime });
+  }
+
+  async setRecurringSchedule(schedule: {
+    enabled: boolean;
+    start_time: string;
+    duration_minutes: number;
+    days_of_week: number[];
+    auto_reset?: boolean;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/schedule/recurring', schedule);
+  }
+
+  async getSchedule(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/schedule');
+  }
+
+  async clearSchedule(): Promise<ApiResponse> {
+    return apiService.delete('/api/simulation/schedule');
+  }
+
+  // Integration and webhooks
+  async registerWebhook(webhook: {
+    url: string;
+    events: string[];
+    secret?: string;
+    enabled: boolean;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/webhooks', webhook);
+  }
+
+  async testWebhook(webhookId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/simulation/webhooks/${webhookId}/test`);
+  }
+
+  async listWebhooks(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/webhooks');
+  }
+
+  async deleteWebhook(webhookId: string): Promise<ApiResponse> {
+    return apiService.delete(`/api/simulation/webhooks/${webhookId}`);
+  }
+
+  // Custom event injection
+  async injectEvent(event: {
+    type: string;
+    data: any;
+    timestamp?: string;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/events/inject', event);
+  }
+
+  async injectTruckBreakdown(truckId: string, severity: 'minor' | 'major' = 'minor'): Promise<ApiResponse> {
+    return this.injectEvent({
+      type: 'truck_breakdown',
+      data: { truck_id: truckId, severity }
+    });
+  }
+
+  async injectBinOverflow(binId: string): Promise<ApiResponse> {
+    return this.injectEvent({
+      type: 'bin_overflow',
+      data: { bin_id: binId }
+    });
+  }
+
+  async injectTrafficJam(location: { latitude: number; longitude: number }, duration: number): Promise<ApiResponse> {
+    return this.injectEvent({
+      type: 'traffic_jam',
+      data: { location, duration_minutes: duration }
+    });
+  }
+
+  // Performance optimization
+  async optimizePerformance(): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/optimize_performance');
+  }
+
+  async enableBatchMode(enabled: boolean = true): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/batch_mode', { enabled });
+  }
+
+  async setMaxConcurrency(maxThreads: number): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/concurrency', { max_threads: maxThreads });
+  }
+
+  async enableCaching(enabled: boolean = true): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/caching', { enabled });
+  }
+
+  // Development and debugging utilities
+  async enableVerboseLogging(enabled: boolean = true): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/verbose_logging', { enabled });
+  }
+
+  async dumpState(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/dump_state');
+  }
+
+  async getMemoryUsage(): Promise<ApiResponse> {
+    return apiService.get('/api/simulation/memory_usage');
+  }
+
+  async garbageCollect(): Promise<ApiResponse> {
+    return apiService.post('/api/simulation/gc');
+  }
+
+  // Helper methods for common workflows
+  async quickStart(preset: 'demo' | 'stress' | 'minimal' = 'demo'): Promise<ApiResponse> {
     try {
-      const status = await this.getStatus();
-      return status.status.current_time;
-    } catch {
-      return null;
+      await this.stop();
+      await this.reset();
+      await this.applyPreset(preset);
+      return this.start();
+    } catch (error) {
+      return {
+        success: false,
+        error: `Quick start failed: ${error}`
+      };
     }
   }
 
-  async getSystemHealth(): Promise<{
-    healthy: boolean;
-    issues: string[];
-  }> {
+  async emergencyStop(): Promise<ApiResponse> {
     try {
-      const health = await this.getHealthStatus();
-      
-      const issues: string[] = [];
-      
-      if (!health.data?.healthy) {
-        if (!health.data?.health_status?.simulation_running) {
-          issues.push('Simulation not running');
-        }
-        
-        Object.entries(health.data?.health_status?.services || {}).forEach(([service, status]) => {
-          if (!status) {
-            issues.push(`${service} service unavailable`);
-          }
-        });
-      }
-
+      await this.stop();
+      await this.clearEvents();
       return {
-        healthy: health.data?.healthy || false,
-        issues
+        success: true,
+        message: 'Emergency stop completed'
       };
     } catch (error) {
       return {
-        healthy: false,
-        issues: ['Failed to check system health']
+        success: false,
+        error: `Emergency stop failed: ${error}`
       };
     }
   }
 
-  // Batch operations
-  async batchControl(operations: Array<{
-    action: 'start' | 'pause' | 'stop' | 'setSpeed';
-    params?: any;
-  }>): Promise<ApiResponse[]> {
-    const results: ApiResponse[] = [];
-    
-    for (const operation of operations) {
-      try {
-        let result: ApiResponse;
-        
-        switch (operation.action) {
-          case 'start':
-            result = await this.start();
-            break;
-          case 'pause':
-            result = await this.pause();
-            break;
-          case 'stop':
-            result = await this.stop();
-            break;
-          case 'setSpeed':
-            result = await this.setSpeed(operation.params?.speed || 1);
-            break;
-          default:
-            result = { success: false, error: `Unknown action: ${operation.action}` };
-        }
-        
-        results.push(result);
-      } catch (error) {
-        results.push({
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    }
-    
-    return results;
-  }
-
-  // Event filtering helpers
-  async getEventsByType(type: string, limit: number = 50): Promise<SimulationEvent[]> {
+  async safeRestart(): Promise<ApiResponse> {
     try {
-      const response = await this.getEvents({ type, limit });
-      return response.data?.events || [];
-    } catch {
-      return [];
+      await this.pause();
+      await this.saveState('auto_restart_backup');
+      await this.stop();
+      await this.restart();
+      return {
+        success: true,
+        message: 'Safe restart completed'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Safe restart failed: ${error}`
+      };
     }
   }
 
-  async getRecentEvents(limit: number = 20): Promise<SimulationEvent[]> {
+  async getDetailedStatus(): Promise<{
+    basic: any;
+    performance: any;
+    health: any;
+    recent_events: any[];
+  }> {
     try {
-      const response = await this.getEvents({ limit });
-      return response.data?.events || [];
-    } catch {
-      return [];
+      const [status, performance, health, events] = await Promise.all([
+        this.getStatus(),
+        this.getPerformanceMetrics(),
+        this.getHealthStatus(),
+        this.getEvents({ limit: 10 })
+      ]);
+
+      return {
+        basic: status.success ? status.status : {},
+        performance: performance.success ? performance.data : {},
+        health: health.success ? health.data : {},
+        recent_events: events.success ? events.data?.events || [] : []
+      };
+    } catch (error) {
+      return {
+        basic: {},
+        performance: {},
+        health: {},
+        recent_events: []
+      };
     }
-  }
-
-  // Configuration presets
-  async applyPreset(preset: 'default' | 'efficient' | 'conservative' | 'testing'): Promise<ApiResponse> {
-    const presets = {
-      default: {
-        auto_optimization: true,
-        auto_bin_filling: true,
-        truck_breakdown_probability: 0.001,
-        bin_overflow_enabled: true,
-        depot_processing_enabled: true,
-        emit_frequency: 1,
-        max_trucks_per_optimization: 10
-      },
-      efficient: {
-        auto_optimization: true,
-        auto_bin_filling: true,
-        truck_breakdown_probability: 0.0005,
-        bin_overflow_enabled: true,
-        depot_processing_enabled: true,
-        emit_frequency: 2,
-        max_trucks_per_optimization: 15
-      },
-      conservative: {
-        auto_optimization: true,
-        auto_bin_filling: true,
-        truck_breakdown_probability: 0.002,
-        bin_overflow_enabled: true,
-        depot_processing_enabled: true,
-        emit_frequency: 1,
-        max_trucks_per_optimization: 8
-      },
-      testing: {
-        auto_optimization: false,
-        auto_bin_filling: true,
-        truck_breakdown_probability: 0.01,
-        bin_overflow_enabled: false,
-        depot_processing_enabled: true,
-        emit_frequency: 1,
-        max_trucks_per_optimization: 5
-      }
-    };
-
-    return this.updateConfig(presets[preset]);
   }
 }
 

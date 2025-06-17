@@ -130,276 +130,312 @@ class OptimizationService {
       const efficiency = optimization_potential.potential_efficiency;
       const coverage = (optimization_potential.bins_that_could_be_assigned / 
                        Math.max(1, analysis.analysis.input.urgent_bins)) * 100;
-      const balance = efficiency > 80 ? 85 : 60; // Simplified balance calculation
-      
+      const balance = efficiency > 80 ? 90 : 70; // Simplified balance calculation
+
       const overall_score = (efficiency + coverage + balance) / 3;
-      
-      const recommendations: string[] = [];
-      
-      if (efficiency < 70) {
-        recommendations.push('Consider redistributing bins among trucks');
-      }
-      
-      if (coverage < 80) {
-        recommendations.push('Some bins may not be collected - consider additional trucks');
-      }
-      
-      if (balance < 70) {
-        recommendations.push('Workload is unbalanced across trucks');
-      }
-      
-      if (overall_score > 90) {
-        recommendations.push('Routes are well optimized');
-      }
-      
+
+      const recommendations = [];
+      if (efficiency < 70) recommendations.push('Consider increasing VRP time limit');
+      if (coverage < 80) recommendations.push('Review bin selection criteria');
+      if (balance < 75) recommendations.push('Improve truck load balancing');
+
       return {
-        overall_score: Math.round(overall_score),
-        efficiency: Math.round(efficiency),
-        balance: Math.round(balance),
-        coverage: Math.round(coverage),
+        overall_score,
+        efficiency,
+        balance,
+        coverage,
         recommendations
       };
-    } catch {
+    } catch (error) {
+      console.error('Route quality assessment failed:', error);
       return {
         overall_score: 0,
         efficiency: 0,
         balance: 0,
         coverage: 0,
-        recommendations: ['Error assessing route quality']
+        recommendations: ['Assessment failed']
       };
     }
-  }
-
-  // Performance monitoring
-  async getOptimizationMetrics(): Promise<{
-    average_time: number;
-    success_rate: number;
-    last_optimization: string | null;
-    optimizations_today: number;
-    efficiency_trend: number[];
-  }> {
-    try {
-      const stats = await this.getStatistics();
-      
-      if (!stats.success || !stats.statistics) {
-        return {
-          average_time: 0,
-          success_rate: 0,
-          last_optimization: null,
-          optimizations_today: 0,
-          efficiency_trend: []
-        };
-      }
-
-      const { statistics } = stats;
-      
-      return {
-        average_time: statistics.average_optimization_time,
-        success_rate: 95, // Would calculate from historical data
-        last_optimization: statistics.last_optimization,
-        optimizations_today: statistics.optimization_count,
-        efficiency_trend: statistics.recent_optimization_times.slice(-10)
-      };
-    } catch {
-      return {
-        average_time: 0,
-        success_rate: 0,
-        last_optimization: null,
-        optimizations_today: 0,
-        efficiency_trend: []
-      };
-    }
-  }
-
-  // Configuration presets
-  async applyPreset(preset: 'fast' | 'balanced' | 'thorough'): Promise<ApiResponse> {
-    const presets = {
-      fast: {
-        vrp_time_limit_seconds: 15,
-        knapsack_time_limit_seconds: 3,
-        optimization_algorithm: 'greedy' as const,
-        radar_check_interval_minutes: 5
-      },
-      balanced: {
-        vrp_time_limit_seconds: 30,
-        knapsack_time_limit_seconds: 5,
-        optimization_algorithm: 'auto' as const,
-        radar_check_interval_minutes: 2
-      },
-      thorough: {
-        vrp_time_limit_seconds: 60,
-        knapsack_time_limit_seconds: 10,
-        optimization_algorithm: 'guided_local_search' as const,
-        radar_check_interval_minutes: 1
-      }
-    };
-
-    return this.updateConfig(presets[preset]);
   }
 
   // Advanced optimization features
   async optimizeWithConstraints(constraints: {
-    max_distance_per_truck?: number;
-    max_time_per_route?: number;
-    required_trucks?: string[];
-    forbidden_bins?: string[];
+    max_route_time?: number;
+    max_route_distance?: number;
+    required_truck_ids?: string[];
+    excluded_bin_ids?: string[];
     time_windows?: Array<{ start: string; end: string }>;
   }): Promise<OptimizationResponse> {
-    // This would be implemented with more sophisticated constraints
-    // For now, we'll just do a basic optimization
-    return this.triggerOptimization();
+    return apiService.post('/api/optimization/optimize_constrained', constraints);
   }
 
-  async simulateOptimization(request: OptimizationRequest): Promise<{
-    estimated_time: number;
-    estimated_distance: number;
-    truck_utilization: Record<string, number>;
-    warnings: string[];
-  }> {
-    try {
-      const analysis = await this.analyzeOptimization(request);
-      
-      if (!analysis.success) {
-        return {
-          estimated_time: 0,
-          estimated_distance: 0,
-          truck_utilization: {},
-          warnings: ['Simulation failed']
-        };
-      }
-
-      // Simple estimation based on analysis
-      const binCount = analysis.analysis.input.urgent_bins;
-      const truckCount = analysis.analysis.input.available_trucks;
-      
-      const estimated_time = binCount * 15; // 15 minutes per bin
-      const estimated_distance = binCount * 2; // 2 km per bin
-      
-      const truck_utilization: Record<string, number> = {};
-      // Would calculate actual utilization per truck
-      
-      const warnings: string[] = [];
-      if (binCount > truckCount * 10) {
-        warnings.push('High bin-to-truck ratio may result in long routes');
-      }
-      
-      return {
-        estimated_time,
-        estimated_distance,
-        truck_utilization,
-        warnings
-      };
-    } catch {
-      return {
-        estimated_time: 0,
-        estimated_distance: 0,
-        truck_utilization: {},
-        warnings: ['Simulation error']
-      };
-    }
+  async optimizeMultiObjective(objectives: {
+    minimize_distance?: boolean;
+    minimize_time?: boolean;
+    maximize_efficiency?: boolean;
+    balance_loads?: boolean;
+    weights?: Record<string, number>;
+  }): Promise<OptimizationResponse> {
+    return apiService.post('/api/optimization/multi_objective', objectives);
   }
 
-  // Batch operations
-  async batchOptimization(requests: OptimizationRequest[]): Promise<OptimizationResponse[]> {
-    const results: OptimizationResponse[] = [];
-    
-    for (const request of requests) {
-      try {
-        const result = await this.triggerOptimization(request);
-        results.push(result);
-      } catch (error) {
-        results.push({
-          success: false,
-          message: error instanceof Error ? error.message : 'Optimization failed',
-          optimization_result: {} as OptimizationResult,
-          trucks_optimized: 0,
-          bins_considered: 0
-        });
-      }
-    }
-    
-    return results;
+  async optimizeIncremental(): Promise<OptimizationResponse> {
+    return apiService.post('/api/optimization/incremental');
   }
 
-  // Validation and helpers
-  validateOptimizationRequest(request: OptimizationRequest): {
-    valid: boolean;
-    errors: string[];
-  } {
-    const errors: string[] = [];
-
-    if (request.truck_ids && request.truck_ids.length === 0) {
-      errors.push('At least one truck ID must be provided if truck_ids is specified');
-    }
-
-    if (request.bin_ids && request.bin_ids.length === 0) {
-      errors.push('At least one bin ID must be provided if bin_ids is specified');
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+  async optimizeByPriority(priorities: Record<string, number>): Promise<OptimizationResponse> {
+    return apiService.post('/api/optimization/by_priority', { priorities });
   }
 
-  async getOptimizationStatus(): Promise<{
-    running: boolean;
-    progress: number;
-    current_operation: string | null;
-    estimated_completion: string | null;
-  }> {
-    // This would check if optimization is currently running
-    // For now, return a simple status
-    return {
-      running: false,
-      progress: 0,
-      current_operation: null,
-      estimated_completion: null
-    };
+  // Route operations
+  async validateRoute(truckId: string, binIds: string[]): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/validate_route', {
+      truck_id: truckId,
+      bin_ids: binIds
+    });
+  }
+
+  async optimizeRoute(truckId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/optimization/routes/${truckId}/optimize`);
+  }
+
+  async reorderRoute(truckId: string, binIds: string[]): Promise<ApiResponse> {
+    return apiService.post(`/api/optimization/routes/${truckId}/reorder`, {
+      bin_ids: binIds
+    });
+  }
+
+  async splitRoute(truckId: string, splitPoint: number): Promise<ApiResponse> {
+    return apiService.post(`/api/optimization/routes/${truckId}/split`, {
+      split_point: splitPoint
+    });
+  }
+
+  async mergeRoutes(truckIds: string[]): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/routes/merge', {
+      truck_ids: truckIds
+    });
+  }
+
+  // Performance analysis
+  async getPerformanceMetrics(): Promise<ApiResponse> {
+    return apiService.get('/api/optimization/performance');
+  }
+
+  async compareAlgorithms(algorithms: string[], testData?: any): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/compare_algorithms', {
+      algorithms,
+      test_data: testData
+    });
+  }
+
+  async benchmarkOptimization(): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/benchmark');
+  }
+
+  async getOptimizationHistory(limit?: number): Promise<ApiResponse> {
+    const params = limit ? `?limit=${limit}` : '';
+    return apiService.get(`/api/optimization/history${params}`);
+  }
+
+  // Simulation and what-if analysis
+  async simulateOptimization(scenario: {
+    additional_trucks?: number;
+    reduced_trucks?: number;
+    modified_capacities?: Record<string, number>;
+    traffic_multiplier?: number;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/simulate', scenario);
+  }
+
+  async whatIfAnalysis(changes: {
+    bin_changes?: Array<{ id: string; fill_level?: number; type?: string }>;
+    truck_changes?: Array<{ id: string; capacity?: number; location?: [number, number] }>;
+    traffic_changes?: { multiplier: number };
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/what_if', changes);
+  }
+
+  // Optimization scheduling
+  async scheduleRecurringOptimization(schedule: {
+    interval_minutes: number;
+    start_time?: string;
+    end_time?: string;
+    days_of_week?: number[];
+    enabled: boolean;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/schedule', schedule);
+  }
+
+  async getOptimizationSchedule(): Promise<ApiResponse> {
+    return apiService.get('/api/optimization/schedule');
+  }
+
+  async cancelScheduledOptimization(): Promise<ApiResponse> {
+    return apiService.delete('/api/optimization/schedule');
+  }
+
+  // Real-time optimization
+  async enableRealtimeOptimization(settings: {
+    threshold_changes: boolean;
+    new_urgent_bins: boolean;
+    truck_availability_changes: boolean;
+    interval_minutes: number;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/realtime/enable', settings);
+  }
+
+  async disableRealtimeOptimization(): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/realtime/disable');
+  }
+
+  async getRealtimeOptimizationStatus(): Promise<ApiResponse> {
+    return apiService.get('/api/optimization/realtime/status');
+  }
+
+  // Route export and sharing
+  async exportRoutes(format: 'json' | 'csv' | 'kml' | 'gpx' = 'json'): Promise<ApiResponse> {
+    return apiService.get(`/api/optimization/routes/export?format=${format}`);
+  }
+
+  async shareRoute(truckId: string, recipients: string[]): Promise<ApiResponse> {
+    return apiService.post(`/api/optimization/routes/${truckId}/share`, {
+      recipients
+    });
+  }
+
+  async generateRouteQRCode(truckId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/optimization/routes/${truckId}/qr_code`);
+  }
+
+  // Machine learning and AI features
+  async trainOptimizationModel(trainingData?: any): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/train_model', trainingData);
+  }
+
+  async getModelPerformance(): Promise<ApiResponse> {
+    return apiService.get('/api/optimization/model_performance');
+  }
+
+  async enableAIOptimization(settings: {
+    use_ml_predictions: boolean;
+    confidence_threshold: number;
+    fallback_to_traditional: boolean;
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/ai/enable', settings);
   }
 
   // Integration helpers
-  async optimizeAndWait(request: OptimizationRequest, timeout: number = 60000): Promise<OptimizationResponse> {
-    const startTime = Date.now();
-    
-    const result = await this.triggerOptimization(request);
-    
-    if (!result.success) {
-      return result;
-    }
-
-    // In a real implementation, you might poll for completion status
-    // For now, just return the immediate result
-    return result;
+  async getOptimizationForIntegration(format: 'api' | 'webhook' | 'mqtt'): Promise<ApiResponse> {
+    return apiService.get(`/api/optimization/integration?format=${format}`);
   }
 
-  async getOptimizationHistory(limit: number = 50): Promise<Array<{
-    timestamp: string;
-    duration: number;
-    bins_optimized: number;
-    trucks_used: number;
-    success: boolean;
-  }>> {
+  async registerOptimizationWebhook(url: string, events: string[]): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/webhooks', {
+      url,
+      events
+    });
+  }
+
+  async testOptimizationWebhook(webhookId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/optimization/webhooks/${webhookId}/test`);
+  }
+
+  // Debugging and diagnostics
+  async getOptimizationDiagnostics(): Promise<ApiResponse> {
+    return apiService.get('/api/optimization/diagnostics');
+  }
+
+  async debugOptimization(request: OptimizationRequest): Promise<ApiResponse> {
+    return apiService.post('/api/optimization/debug', request);
+  }
+
+  async getOptimizationLogs(level?: 'debug' | 'info' | 'warning' | 'error'): Promise<ApiResponse> {
+    const params = level ? `?level=${level}` : '';
+    return apiService.get(`/api/optimization/logs${params}`);
+  }
+
+  // Utility methods for common operations
+  async quickOptimize(): Promise<OptimizationResponse> {
+    // Quick optimization for immediate needs
+    return this.optimizeUrgent();
+  }
+
+  async fullOptimize(): Promise<OptimizationResponse> {
+    // Comprehensive optimization
+    return this.optimizeAllBins();
+  }
+
+  async smartOptimize(): Promise<OptimizationResponse> {
+    // AI-powered optimization if available
     try {
+      const status = await this.getRealtimeOptimizationStatus();
+      if (status.success && status.data?.ai_enabled) {
+        return this.triggerOptimization({ use_ai: true });
+      }
+    } catch (error) {
+      console.warn('AI optimization not available, falling back to standard');
+    }
+    
+    return this.optimizeUrgent();
+  }
+
+  async getOptimizationRecommendations(): Promise<ApiResponse> {
+    try {
+      const analysis = await this.analyzeOptimization();
       const stats = await this.getStatistics();
       
-      if (!stats.success) {
-        return [];
-      }
-
-      // This would come from historical data in a real implementation
-      // For now, generate some sample data based on recent optimization times
-      const times = stats.statistics.recent_optimization_times;
+      const recommendations = [];
       
-      return times.map((duration, index) => ({
-        timestamp: new Date(Date.now() - (times.length - index) * 3600000).toISOString(),
-        duration,
-        bins_optimized: Math.floor(Math.random() * 20) + 5,
-        trucks_used: Math.floor(Math.random() * 5) + 1,
-        success: Math.random() > 0.1 // 90% success rate
-      }));
-    } catch {
-      return [];
+      if (analysis.success && analysis.analysis) {
+        const { optimization_potential } = analysis.analysis;
+        
+        if (optimization_potential.potential_efficiency < 70) {
+          recommendations.push({
+            type: 'efficiency',
+            message: 'Consider increasing optimization time limits for better efficiency',
+            priority: 'high'
+          });
+        }
+        
+        if (optimization_potential.bins_that_could_be_assigned < optimization_potential.total_urgent_bins) {
+          recommendations.push({
+            type: 'coverage',
+            message: 'Some urgent bins cannot be assigned. Consider adding more trucks.',
+            priority: 'medium'
+          });
+        }
+      }
+      
+      if (stats.success && stats.statistics) {
+        const { average_route_length, total_optimizations } = stats.statistics;
+        
+        if (average_route_length > 100) {
+          recommendations.push({
+            type: 'route_length',
+            message: 'Routes are getting long. Consider adjusting maximum route distance.',
+            priority: 'low'
+          });
+        }
+        
+        if (total_optimizations > 1000) {
+          recommendations.push({
+            type: 'performance',
+            message: 'Consider enabling AI optimization for better performance.',
+            priority: 'low'
+          });
+        }
+      }
+      
+      return {
+        success: true,
+        recommendations
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to generate recommendations: ${error}`
+      };
     }
   }
 }

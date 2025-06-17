@@ -98,147 +98,269 @@ class TrucksService {
     return apiService.post('/api/trucks/batch', {
       operation,
       truck_ids: truckIds,
-      ...options
+      options
     });
+  }
+
+  async batchMaintenance(truckIds: string[], maintenance: boolean): Promise<ApiResponse> {
+    return this.batchOperation('maintenance', truckIds, { maintenance });
   }
 
   async batchRefuel(truckIds: string[]): Promise<ApiResponse> {
     return this.batchOperation('refuel', truckIds);
   }
 
-  async batchMaintenanceStart(truckIds: string[]): Promise<ApiResponse> {
-    return this.batchOperation('maintenance_start', truckIds);
+  async batchEmpty(truckIds: string[]): Promise<ApiResponse> {
+    return this.batchOperation('empty', truckIds);
   }
 
-  async batchMaintenanceComplete(truckIds: string[]): Promise<ApiResponse> {
-    return this.batchOperation('maintenance_complete', truckIds);
+  async batchSetStatus(truckIds: string[], status: 'online' | 'offline'): Promise<ApiResponse> {
+    return this.batchOperation('set_status', truckIds, { status });
   }
 
-  async batchClearRoutes(truckIds: string[]): Promise<ApiResponse> {
-    return this.batchOperation('clear_routes', truckIds);
+  async batchDelete(truckIds: string[]): Promise<ApiResponse> {
+    return this.batchOperation('delete', truckIds);
   }
 
-  async batchSetOffline(truckIds: string[], offline: boolean = true): Promise<ApiResponse> {
-    return this.batchOperation('set_offline', truckIds, { offline });
+  // Filtering and search
+  async searchTrucks(query: string): Promise<TrucksListResponse> {
+    return apiService.get(`/api/trucks/search?q=${encodeURIComponent(query)}`);
+  }
+
+  async getTrucksByStatus(status: TruckStatus): Promise<TrucksListResponse> {
+    return this.getTrucks({ status });
+  }
+
+  async getAvailableTrucks(): Promise<TrucksListResponse> {
+    return this.getTrucks({ available_only: true });
+  }
+
+  async getTrucksWithRoutes(): Promise<TrucksListResponse> {
+    return apiService.get('/api/trucks/with_routes');
+  }
+
+  async getTrucksNeedingMaintenance(): Promise<TrucksListResponse> {
+    return apiService.get('/api/trucks/needs_maintenance');
+  }
+
+  async getTrucksByLocation(latitude: number, longitude: number, radiusKm: number): Promise<TrucksListResponse> {
+    return apiService.get(`/api/trucks/nearby?lat=${latitude}&lon=${longitude}&radius=${radiusKm}`);
+  }
+
+  // Location and tracking
+  async updateTruckLocation(truckId: string, latitude: number, longitude: number): Promise<TruckResponse> {
+    return apiService.patch(`/api/trucks/${truckId}/location`, {
+      location: [longitude, latitude]
+    });
+  }
+
+  async getTruckHistory(truckId: string, timeRange?: 'hour' | 'day' | 'week'): Promise<ApiResponse> {
+    const params = timeRange ? `?time_range=${timeRange}` : '';
+    return apiService.get(`/api/trucks/${truckId}/history${params}`);
+  }
+
+  async getTruckRoute(truckId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/${truckId}/route`);
+  }
+
+  // Performance and analytics
+  async getTruckAnalytics(truckId: string, timeRange?: 'hour' | 'day' | 'week' | 'month'): Promise<ApiResponse> {
+    const params = timeRange ? `?time_range=${timeRange}` : '';
+    return apiService.get(`/api/trucks/${truckId}/analytics${params}`);
+  }
+
+  async getTruckEfficiency(truckId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/${truckId}/efficiency`);
+  }
+
+  async compareTruckPerformance(truckIds: string[]): Promise<ApiResponse> {
+    return apiService.post('/api/trucks/compare_performance', { truck_ids: truckIds });
+  }
+
+  async getTruckUtilization(): Promise<ApiResponse> {
+    return apiService.get('/api/trucks/utilization');
+  }
+
+  async calculateFleetEfficiency(): Promise<ApiResponse> {
+    return apiService.get('/api/trucks/fleet_efficiency');
+  }
+
+  // Capacity and load management
+  async updateTruckLoad(truckId: string, load: number): Promise<TruckResponse> {
+    return apiService.patch(`/api/trucks/${truckId}/load`, { load });
+  }
+
+  async updateTruckCapacity(truckId: string, capacity: number): Promise<TruckResponse> {
+    return apiService.patch(`/api/trucks/${truckId}/capacity`, { capacity });
+  }
+
+  async setTruckFuelLevel(truckId: string, fuelLevel: number): Promise<TruckResponse> {
+    return apiService.patch(`/api/trucks/${truckId}/fuel`, { fuel_level: fuelLevel });
+  }
+
+  // Route optimization for individual trucks
+  async optimizeTruckRoute(truckId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/optimize_route`);
+  }
+
+  async assignBinsToTruck(truckId: string, binIds: string[]): Promise<TruckResponse> {
+    return apiService.post(`/api/trucks/${truckId}/assign_bins`, { bin_ids: binIds });
+  }
+
+  async removeBinFromRoute(truckId: string, binId: string): Promise<TruckResponse> {
+    return apiService.delete(`/api/trucks/${truckId}/route/bins/${binId}`);
+  }
+
+  // Maintenance scheduling
+  async scheduleMaintenance(truckId: string, scheduledTime: string): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/schedule_maintenance`, {
+      scheduled_time: scheduledTime
+    });
+  }
+
+  async getMaintenanceSchedule(truckId?: string): Promise<ApiResponse> {
+    const endpoint = truckId ? `/api/trucks/${truckId}/maintenance_schedule` : '/api/trucks/maintenance_schedule';
+    return apiService.get(endpoint);
+  }
+
+  async cancelScheduledMaintenance(truckId: string): Promise<ApiResponse> {
+    return apiService.delete(`/api/trucks/${truckId}/maintenance_schedule`);
+  }
+
+  // Fuel management
+  async getFuelConsumption(truckId: string, timeRange?: string): Promise<ApiResponse> {
+    const params = timeRange ? `?time_range=${timeRange}` : '';
+    return apiService.get(`/api/trucks/${truckId}/fuel_consumption${params}`);
+  }
+
+  async predictFuelNeeds(truckId: string, routeDistance: number): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/predict_fuel`, {
+      route_distance: routeDistance
+    });
+  }
+
+  async getFuelStations(latitude: number, longitude: number, radius: number): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/fuel_stations?lat=${latitude}&lon=${longitude}&radius=${radius}`);
+  }
+
+  // Real-time tracking
+  async subscribeTo(truckId: string, callback: (truck: Truck) => void): Promise<() => void> {
+    // This would typically use WebSocket or Server-Sent Events
+    // For now, we'll simulate with polling
+    const interval = setInterval(async () => {
+      try {
+        const response = await this.getTruck(truckId);
+        if (response.success && response.truck) {
+          callback(response.truck);
+        }
+      } catch (error) {
+        console.error('Error fetching truck updates:', error);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }
+
+  // Import/Export
+  async exportTrucks(format: 'csv' | 'json' | 'excel' = 'csv'): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/export?format=${format}`);
+  }
+
+  async importTrucks(file: File, format: 'csv' | 'json' | 'excel'): Promise<ApiResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('format', format);
+
+    return apiService.post('/api/trucks/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  }
+
+  // Simulation and testing
+  async simulateTruckOperation(truckId: string, scenario: 'normal' | 'breakdown' | 'efficiency'): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/simulate`, { scenario });
+  }
+
+  async testTruckCapacity(truckId: string, testLoad: number): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/test_capacity`, { test_load: testLoad });
+  }
+
+  // Alerts and notifications
+  async getTruckAlerts(truckId?: string): Promise<ApiResponse> {
+    const endpoint = truckId ? `/api/trucks/${truckId}/alerts` : '/api/trucks/alerts';
+    return apiService.get(endpoint);
+  }
+
+  async acknowledgeAlert(alertId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/alerts/${alertId}/acknowledge`);
+  }
+
+  async dismissAlert(alertId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/alerts/${alertId}/dismiss`);
+  }
+
+  // Fleet reporting
+  async generateFleetReport(options?: {
+    time_range?: string;
+    include_analytics?: boolean;
+    format?: 'pdf' | 'excel' | 'csv';
+  }): Promise<ApiResponse> {
+    return apiService.post('/api/trucks/report', options);
+  }
+
+  async getFleetSummary(): Promise<ApiResponse> {
+    return apiService.get('/api/trucks/fleet_summary');
+  }
+
+  async getFleetKPIs(): Promise<ApiResponse> {
+    return apiService.get('/api/trucks/kpis');
+  }
+
+  // Predictive analytics
+  async predictMaintenanceNeeds(truckId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/${truckId}/predict_maintenance`);
+  }
+
+  async predictOptimalRoutes(truckId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/${truckId}/predict_routes`);
+  }
+
+  async getEfficiencyTrends(timeRange: 'week' | 'month' | 'quarter'): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/efficiency_trends?time_range=${timeRange}`);
+  }
+
+  // Integration helpers
+  async syncWithGPS(truckId: string, gpsData: any): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/sync_gps`, gpsData);
+  }
+
+  async updateFromExternalSystem(truckId: string, externalData: any): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/external_update`, externalData);
   }
 
   // Utility methods
-  async getAvailableTrucks(): Promise<Truck[]> {
-    try {
-      const response = await this.getTrucks({ available_only: true });
-      return response.trucks || [];
-    } catch {
-      return [];
+  async findNearestTruck(latitude: number, longitude: number, filters?: {
+    status?: TruckStatus;
+    available_only?: boolean;
+  }): Promise<TruckResponse> {
+    const queryParams = new URLSearchParams({
+      lat: latitude.toString(),
+      lon: longitude.toString()
+    });
+
+    if (filters?.status) {
+      queryParams.append('status', filters.status);
     }
-  }
-
-  async getTrucksByStatus(status: TruckStatus): Promise<Truck[]> {
-    try {
-      const response = await this.getTrucks({ status });
-      return response.trucks || [];
-    } catch {
-      return [];
+    if (filters?.available_only) {
+      queryParams.append('available_only', 'true');
     }
+
+    return apiService.get(`/api/trucks/nearest?${queryParams}`);
   }
 
-  async getIdleTrucks(): Promise<Truck[]> {
-    return this.getTrucksByStatus(TruckStatus.IDLE);
-  }
-
-  async getTrucksInMaintenance(): Promise<Truck[]> {
-    return this.getTrucksByStatus(TruckStatus.MAINTENANCE);
-  }
-
-  async getTrucksWithRoutes(): Promise<Truck[]> {
-    try {
-      const response = await this.getTrucks();
-      return response.trucks?.filter(truck => truck.route.length > 0) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  async getTrucksNeedingMaintenance(): Promise<Truck[]> {
-    try {
-      const response = await this.getTrucks();
-      return response.trucks?.filter(truck => truck.needs_maintenance) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  async getTrucksLowFuel(threshold: number = 20): Promise<Truck[]> {
-    try {
-      const response = await this.getTrucks();
-      return response.trucks?.filter(truck => truck.fuel_level < threshold) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  // Performance calculations
-  async calculateFleetEfficiency(): Promise<{
-    utilization: number;
-    availability: number;
-    maintenance_ratio: number;
-    fuel_efficiency: number;
-  }> {
-    try {
-      const response = await this.getTrucks();
-      const trucks = response.trucks || [];
-      
-      if (trucks.length === 0) {
-        return { utilization: 0, availability: 0, maintenance_ratio: 0, fuel_efficiency: 0 };
-      }
-
-      const available = trucks.filter(t => t.is_available).length;
-      const withRoutes = trucks.filter(t => t.route.length > 0).length;
-      const inMaintenance = trucks.filter(t => t.status === TruckStatus.MAINTENANCE).length;
-      const avgFuel = trucks.reduce((sum, t) => sum + t.fuel_level, 0) / trucks.length;
-
-      return {
-        utilization: (withRoutes / Math.max(available, 1)) * 100,
-        availability: (available / trucks.length) * 100,
-        maintenance_ratio: (inMaintenance / trucks.length) * 100,
-        fuel_efficiency: avgFuel
-      };
-    } catch {
-      return { utilization: 0, availability: 0, maintenance_ratio: 0, fuel_efficiency: 0 };
-    }
-  }
-
-  // Route optimization helpers
-  async optimizeTruckRoute(truckId: string, binIds: string[]): Promise<string[]> {
-    try {
-      // This would typically call an optimization endpoint
-      // For now, just return the original order
-      return binIds;
-    } catch {
-      return binIds;
-    }
-  }
-
-  async estimateRouteTime(truckId: string, binIds: string[]): Promise<number> {
-    try {
-      const truck = await this.getTruck(truckId);
-      // Simple estimation: 10 minutes per bin + travel time
-      return binIds.length * 10;
-    } catch {
-      return 0;
-    }
-  }
-
-  async estimateRouteDistance(truckId: string, binIds: string[]): Promise<number> {
-    try {
-      // Simple estimation: 2km per bin
-      return binIds.length * 2;
-    } catch {
-      return 0;
-    }
-  }
-
-  // Fleet management helpers
-  async getFleetSummary(): Promise<{
+  async getFleetOverview(): Promise<{
     total: number;
     available: number;
     busy: number;
@@ -249,22 +371,14 @@ class TrucksService {
   }> {
     try {
       const response = await this.getTrucks();
-      const trucks = response.trucks || [];
-      
-      if (trucks.length === 0) {
-        return {
-          total: 0,
-          available: 0,
-          busy: 0,
-          maintenance: 0,
-          offline: 0,
-          avgLoad: 0,
-          avgFuel: 0
-        };
-      }
+      const trucks = response.data || [];
 
-      const available = trucks.filter(t => t.is_available).length;
-      const busy = trucks.filter(t => t.status === TruckStatus.EN_ROUTE || t.status === TruckStatus.COLLECTING).length;
+      const available = trucks.filter(t => t.status === TruckStatus.IDLE).length;
+      const busy = trucks.filter(t => 
+        t.status === TruckStatus.EN_ROUTE || 
+        t.status === TruckStatus.COLLECTING || 
+        t.status === TruckStatus.RETURNING
+      ).length;
       const maintenance = trucks.filter(t => t.status === TruckStatus.MAINTENANCE).length;
       const offline = trucks.filter(t => t.status === TruckStatus.OFFLINE).length;
       const avgLoad = trucks.reduce((sum, t) => sum + t.load_percentage, 0) / trucks.length;
@@ -316,10 +430,67 @@ class TrucksService {
       errors.push('Fuel consumption cannot be negative');
     }
 
+    if (data.location && (!Array.isArray(data.location) || data.location.length !== 2)) {
+      errors.push('Location must be [longitude, latitude]');
+    }
+
     return {
       valid: errors.length === 0,
       errors
     };
+  }
+
+  // Route validation
+  async validateRoute(truckId: string, binIds: string[]): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/validate_route`, {
+      bin_ids: binIds
+    });
+  }
+
+  // Emergency operations
+  async emergencyStop(truckId: string, reason: string): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/emergency_stop`, { reason });
+  }
+
+  async emergencyReturn(truckId: string): Promise<ApiResponse> {
+    return apiService.post(`/api/trucks/${truckId}/emergency_return`);
+  }
+
+  async broadcastEmergency(message: string, truckIds?: string[]): Promise<ApiResponse> {
+    return apiService.post('/api/trucks/emergency_broadcast', {
+      message,
+      truck_ids: truckIds
+    });
+  }
+
+  // Advanced analytics
+  async getPerformanceBenchmarks(): Promise<ApiResponse> {
+    return apiService.get('/api/trucks/benchmarks');
+  }
+
+  async analyzeRouteEfficiency(truckId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/${truckId}/route_efficiency`);
+  }
+
+  async getIdleTimeAnalysis(): Promise<ApiResponse> {
+    return apiService.get('/api/trucks/idle_analysis');
+  }
+
+  async getFuelEfficiencyRanking(): Promise<ApiResponse> {
+    return apiService.get('/api/trucks/fuel_efficiency_ranking');
+  }
+
+  // Machine learning features
+  async trainRoutePredictionModel(): Promise<ApiResponse> {
+    return apiService.post('/api/trucks/train_route_model');
+  }
+
+  async getPredictiveMaintenanceScore(truckId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/${truckId}/maintenance_score`);
+  }
+
+  async getOptimalLoadPrediction(truckId: string): Promise<ApiResponse> {
+    return apiService.get(`/api/trucks/${truckId}/optimal_load`);
   }
 }
 
