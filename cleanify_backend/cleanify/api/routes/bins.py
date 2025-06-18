@@ -129,7 +129,7 @@ def create_bin():
             "fill_level": data.get("fill_level", 0.0),
             "static_threshold": data["static_threshold"],
             "capacity": data.get("capacity", 100.0),
-            "fill_rate": data.get("fill_rate", 5.0),
+            "fill_rate": data.get("fill_rate", 10.0),
             "priority": data.get("priority", 1)
         }
         

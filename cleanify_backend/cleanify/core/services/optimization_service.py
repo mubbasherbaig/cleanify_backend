@@ -339,7 +339,8 @@ class OptimizationService:
     def _optimize_truck_route(self, truck: Any, assigned_bins: List[Any]) -> Dict[str, Any]:
         """Optimize route for a single truck's assigned bins"""
         if not assigned_bins:
-            return {"success": True, "optimized_bin_ids": [], "total_distance": 0, "total_duration": 0}
+            return {"success": True, "optimized_bin_ids": [], "total_distance": 0, 
+                    "total_duration": 0, "route_geometry": []}
         
         # Create coordinate list: depot -> bins -> depot
         coordinates = [truck.depot_location]
@@ -352,30 +353,53 @@ class OptimizationService:
         coordinates.append(truck.depot_location)  # Return to depot
         
         try:
-            if self.osrm_service and len(coordinates) > 3:  # Worth optimizing
-                # Use OSRM to optimize waypoint order
-                optimization_result = self.osrm_service.optimize_route(coordinates[1:-1])  # Exclude depot
-                
-                if 'waypoints' in optimization_result:
-                    # Reorder bins based on optimization
-                    optimized_order = optimization_result['waypoints']
-                    optimized_bin_ids = [bin_ids[i] for i in optimized_order]
-                    
-                    return {
-                        "success": True,
-                        "optimized_bin_ids": optimized_bin_ids,
-                        "total_distance": optimization_result.get('distance', 0),
-                        "total_duration": optimization_result.get('duration', 0),
-                        "original_order": bin_ids,
-                        "optimization_used": True
-                    }
+            route_geometry = []  # Store the actual road path
             
-            # Fallback: use original order
+            if self.osrm_service and len(coordinates) > 2:
+                # Get the full route with geometry from OSRM
+                try:
+                    # Request route with full geometry
+                    route_result = self.osrm_service.route(
+                        coordinates, 
+                        options={
+                            'overview': 'full',      # Get full geometry
+                            'geometries': 'geojson', # GeoJSON format
+                            'steps': 'false'
+                        }
+                    )
+                    
+                    if 'routes' in route_result and route_result['routes']:
+                        route = route_result['routes'][0]
+                        
+                        # Extract geometry coordinates
+                        if 'geometry' in route and 'coordinates' in route['geometry']:
+                            # OSRM returns [lon, lat] format
+                            geometry_coords = route['geometry']['coordinates']
+                            # Convert to [lat, lon] for Leaflet
+                            route_geometry = [[coord[1], coord[0]] for coord in geometry_coords]
+                        
+                        return {
+                            "success": True,
+                            "optimized_bin_ids": bin_ids,  # Keep original order for now
+                            "total_distance": route.get('distance', 0) / 1000.0,  # Convert to km
+                            "total_duration": route.get('duration', 0) / 60.0,    # Convert to minutes
+                            "route_geometry": route_geometry,  # NEW: Actual road path
+                            "original_order": bin_ids,
+                            "optimization_used": True
+                        }
+                        
+                except Exception as e:
+                    self.logger.warning(f"OSRM route geometry failed: {e}")
+            
+            # Fallback: create simple path between points
+            route_geometry = [[coord[1], coord[0]] for coord in coordinates]  # Convert to [lat, lon]
+            
             return {
                 "success": True,
                 "optimized_bin_ids": bin_ids,
                 "total_distance": 0,
                 "total_duration": 0,
+                "route_geometry": route_geometry,  # Simple straight lines as fallback
                 "original_order": bin_ids,
                 "optimization_used": False
             }
@@ -387,20 +411,45 @@ class OptimizationService:
                 "optimized_bin_ids": bin_ids,
                 "total_distance": 0,
                 "total_duration": 0,
+                "route_geometry": [],
                 "error": str(e),
                 "optimization_used": False
             }
     
     def _get_bins_needing_collection(self) -> List[Any]:
         """Get bins that need collection based on thresholds"""
-        # This would typically query the bin service/database
-        # For now, return empty list as bins are passed to methods
+        # Access current Flask app context to get simulation service
+        try:
+            from flask import current_app
+            if hasattr(current_app, 'simulation_service'):
+                sim_svc = current_app.simulation_service
+                bins_needing_collection = []
+                for bin_obj in sim_svc.bins:
+                    if bin_obj.status.value == "active":
+                        threshold = sim_svc.threshold_service.threshold_for(bin_obj)
+                        if bin_obj.fill_level >= threshold:
+                            bins_needing_collection.append(bin_obj)
+                return bins_needing_collection
+        except:
+            pass
         return []
-    
+
     def _find_urgent_bins(self) -> List[Any]:
         """Find bins that have become urgent"""
-        # This would check for bins above urgency threshold
-        # Implementation depends on how bins are stored/accessed
+        # Access current Flask app context to get simulation service  
+        try:
+            from flask import current_app
+            if hasattr(current_app, 'simulation_service'):
+                sim_svc = current_app.simulation_service
+                urgent_bins = []
+                for bin_obj in sim_svc.bins:
+                    if bin_obj.status.value == "active":
+                        threshold = sim_svc.threshold_service.threshold_for(bin_obj)
+                        if bin_obj.fill_level >= threshold:
+                            urgent_bins.append(bin_obj)
+                return urgent_bins
+        except:
+            pass
         return []
     
     def _try_incremental_insertion(self, bin_obj: Any, trucks: List[Any]) -> bool:

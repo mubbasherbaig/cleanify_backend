@@ -25,7 +25,7 @@ from .osrm_service import OSRMService
 class SimulationService(threading.Thread):
     """Main simulation service managing the waste collection simulation"""
     
-    TICK_REAL_SECONDS = 0.2            # 5 Hz loop (change if heavy)
+    TICK_REAL_SECONDS = 0.1            # 5 Hz loop (change if heavy)
 
     def __init__(self, sio):
         super().__init__(daemon=True)
@@ -472,7 +472,7 @@ class SimulationService(threading.Thread):
         
         depot_location = (74.3587, 31.5204)  # Lahore coordinates
         
-        for i in range(3):
+        for i in range(6):
             truck = Truck(
                 id=f"truck_{i+1}",
                 capacity=1000.0,
@@ -509,7 +509,7 @@ class SimulationService(threading.Thread):
                     fill_level=30.0 + (i * 10),  # Varying fill levels
                     static_threshold=80.0,
                     capacity=100.0,
-                    fill_rate=5.0
+                    fill_rate=45.0
                 )
                 bins.append(bin_obj)
         

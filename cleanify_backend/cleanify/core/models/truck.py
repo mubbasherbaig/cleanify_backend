@@ -60,19 +60,11 @@ class Truck:
         return self.load <= 0.01  # Small threshold for floating point precision
     
     def needs_maintenance(self) -> bool:
-        """Check if truck needs maintenance based on various factors"""
-        # Check if explicitly in maintenance status
         if self.status == TruckStatus.MAINTENANCE:
             return True
-        
-        # Check fuel level
         if self.fuel_level < 10:
             return True
-        
-        # Check maintenance schedule (simplified - every 1000km)
-        if self.total_distance_traveled % 1000 < 10:
-            return True
-        
+        # REMOVED: if self.total_distance_traveled % 1000 < 10:
         return False
     
     def can_collect_bin(self, bin_load: float) -> bool:
@@ -137,11 +129,8 @@ class Truck:
         return None
     
     def move_towards(self, destination: Tuple[float, float], time_delta_minutes: float, 
-                     traffic_multiplier: float = 1.0) -> bool:
-        """
-        Move truck towards destination for given time.
-        Returns True if destination reached.
-        """
+                 traffic_multiplier: float = 1.0) -> bool:
+        """Move truck towards destination for given time."""
         if self.status == TruckStatus.OFFLINE or self.status == TruckStatus.MAINTENANCE:
             return False
         
@@ -151,16 +140,21 @@ class Truck:
         if distance_to_dest < 0.01:  # Already at destination (within 10m)
             return True
         
-        # Calculate how far truck can move in given time
+        # IMPROVED: Better speed calculation with simulation multiplier
         time_hours = time_delta_minutes / 60.0
-        max_distance = (self.speed / traffic_multiplier) * time_hours
         
-        # Update fuel consumption
-        fuel_consumed = max_distance * self.fuel_consumption
+        # Apply traffic and get effective speed
+        effective_speed = self.speed / traffic_multiplier  # km/h
+        
+        # BOOSTED: Multiply by 5 for more visible movement
+        max_distance = effective_speed * time_hours * 5  # Increased movement
+        
+        # Update fuel consumption (using original distance, not boosted)
+        actual_distance = min(effective_speed * time_hours, distance_to_dest)
+        fuel_consumed = actual_distance * self.fuel_consumption
         self.fuel_level = max(0, self.fuel_level - fuel_consumed)
         
         # Update total distance
-        actual_distance = min(max_distance, distance_to_dest)
         self.total_distance_traveled += actual_distance
         
         if max_distance >= distance_to_dest:

@@ -357,7 +357,7 @@ class OSRMService:
         """Check if OSRM service is available"""
         try:
             # Simple health check
-            response = requests.get(f"{self.host}/route/v1/driving/0,0;0.1,0.1", 
+            response = requests.get(f"{self.host}/route/v1/driving/74.3587,31.5204;74.3700,31.5300",
                                   timeout=2)
             return response.status_code == 200
         except:

@@ -27,7 +27,7 @@ class Config:
     DEFAULT_SIMULATION_SPEED = 1
     MAX_SIMULATION_SPEED = 10
     MIN_SIMULATION_SPEED = 1
-    SIMULATION_TICK_RATE = 0.2  # seconds (5 Hz)
+    SIMULATION_TICK_RATE = 0.1  # seconds (5 Hz)
     
     # Default working hours
     DEFAULT_WORKING_HOURS = (8, 18)  # 8 AM to 6 PM

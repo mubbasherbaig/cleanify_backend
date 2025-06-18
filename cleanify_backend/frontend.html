@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleanify - Waste Management System</title>
+    
+    <!-- External Libraries -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f6fa;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 300;
+        }
+
+        .header-center {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .simulation-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .control-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+
+        .control-btn.active {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: 1rem;
+        }
+
+        .speed-slider {
+            width: 100px;
+        }
+
+        .time-display {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+
+        /* Sidebars */
+        .sidebar {
+            width: 350px;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .sidebar-content {
+            padding: 1rem;
+        }
+
+        /* Map Container */
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            transition: all 0.3s ease;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+        }
+
+        .tab.active {
+            background: white;
+            border-bottom: 3px solid #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-title {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Lists */
+        .item-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            border-bottom: 1px solid #f1f3f4;
+            transition: background 0.2s ease;
+        }
+
+        .list-item:hover {
+            background: #f8f9fa;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-name {
+            font-weight: 500;
+            color: #343a40;
+        }
+
+        .item-details {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        /* Status badges */
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-idle { background: #d1ecf1; color: #0c5460; }
+        .status-en-route { background: #d4edda; color: #155724; }
+        .status-collecting { background: #fff3cd; color: #856404; }
+        .status-returning { background: #f8d7da; color: #721c24; }
+        .status-maintenance { background: #e2e3e5; color: #383d41; }
+        .status-offline { background: #f8d7da; color: #721c24; }
+
+        .status-active { background: #d4edda; color: #155724; }
+        .status-full { background: #f8d7da; color: #721c24; }
+
+        /* Progress bars */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+            transition: width 0.3s ease;
+        }
+
+        /* Statistics */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        /* Events */
+        .event-item {
+            padding: 0.5rem;
+            border-left: 3px solid #667eea;
+            background: #f8f9fa;
+            margin-bottom: 0.5rem;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .event-time {
+            font-size: 0.7rem;
+            color: #6c757d;
+        }
+
+        .event-text {
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.25);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6c757d;
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1500;
+            max-width: 300px;
+            border-left: 4px solid #28a745;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.error {
+            border-left-color: #dc3545;
+        }
+
+        .notification.warning {
+            border-left-color: #ffc107;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 300px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .simulation-controls {
+                flex-wrap: wrap;
+            }
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: #6c757d;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e9ecef;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Map overlays */
+        .map-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .truck-icon { background: #007bff; }
+        .bin-icon { background: #28a745; }
+        .depot-icon { background: #ffc107; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1><i class="fas fa-truck"></i> Cleanify</h1>
+        
+        <div class="header-center">
+            <div class="simulation-controls">
+                <button class="control-btn" id="playPauseBtn" title="Play/Pause">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button class="control-btn" id="stopBtn" title="Stop">
+                    <i class="fas fa-stop"></i>
+                </button>
+                <div class="speed-control">
+                    <span>Speed:</span>
+                    <input type="range" class="speed-slider" id="speedSlider" min="1" max="10" value="1">
+                    <span id="speedValue">1x</span>
+                </div>
+            </div>
+            
+            <div class="time-display" id="timeDisplay">
+                Loading...
+            </div>
+        </div>
+        
+        <div>
+            <button class="control-btn" id="settingsBtn" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="tabs">
+                <button class="tab active" data-tab="trucks">Trucks</button>
+                <button class="tab" data-tab="bins">Bins</button>
+                <button class="tab" data-tab="events">Events</button>
+            </div>
+            
+            <!-- Trucks Tab -->
+            <div class="tab-content active" id="trucks-tab">
+                <div class="sidebar-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Fleet Overview</div>
+                            <button class="btn btn-sm btn-primary" id="optimizeBtn">
+                                <i class="fas fa-route"></i> Optimize
+                            </button>
+                        </div>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalTrucks">0</div>
+                                <div class="stat-label">Total Trucks</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="activeTrucks">0</div>
+                                <div class="stat-label">Active</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-title">Trucks</div>
+                        <div class="item-list" id="trucksList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading trucks...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bins Tab -->
+            <div class="tab-content" id="bins-tab">
+                <div class="sidebar-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Bins Overview</div>
+                            <button class="btn btn-sm btn-warning" id="collectUrgentBtn">
+                                <i class="fas fa-exclamation-triangle"></i> Urgent
+                            </button>
+                        </div>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalBins">0</div>
+                                <div class="stat-label">Total Bins</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="urgentBins">0</div>
+                                <div class="stat-label">Urgent</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-title">Bins</div>
+                        <div class="item-list" id="binsList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading bins...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Events Tab -->
+            <div class="tab-content" id="events-tab">
+                <div class="sidebar-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Recent Events</div>
+                            <button class="btn btn-sm btn-danger" id="clearEventsBtn">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                        </div>
+                        <div class="item-list" id="eventsList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading events...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- Map Overlay -->
+            <div class="map-overlay">
+                <div><strong>Traffic:</strong> <span id="trafficStatus">Normal</span></div>
+                <div><strong>Mode:</strong> <span id="thresholdMode">Static</span></div>
+            </div>
+            
+            <!-- Legend -->
+            <div class="legend">
+                <h4 style="margin-bottom: 0.5rem;">Legend</h4>
+                <div class="legend-item">
+                    <div class="legend-icon truck-icon"></div>
+                    <span>Trucks</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon bin-icon"></div>
+                    <span>Bins</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon depot-icon"></div>
+                    <span>Depots</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="sidebar">
+            <div class="tabs">
+                <button class="tab active" data-tab="stats">Stats</button>
+                <button class="tab" data-tab="routes">Routes</button>
+                <button class="tab" data-tab="settings">Settings</button>
+            </div>
+            
+            <!-- Statistics Tab -->
+            <div class="tab-content active" id="stats-tab">
+                <div class="sidebar-content">
+                    <div class="card">
+                        <div class="card-title">Performance</div>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalCollections">0</div>
+                                <div class="stat-label">Collections</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalDistance">0</div>
+                                <div class="stat-label">Distance (km)</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-title">System Status</div>
+                        <div id="systemStatus">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading status...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Routes Tab -->
+            <div class="tab-content" id="routes-tab">
+                <div class="sidebar-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Active Routes</div>
+                            <button class="btn btn-sm btn-danger" id="clearRoutesBtn">
+                                <i class="fas fa-route"></i> Clear All
+                            </button>
+                        </div>
+                        <div class="item-list" id="routesList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading routes...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Tab -->
+            <div class="tab-content" id="settings-tab">
+                <div class="sidebar-content">
+                    <div class="card">
+                        <div class="card-title">Quick Settings</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Traffic Mode</label>
+                            <select class="form-control" id="trafficMode">
+                                <option value="auto">Automatic</option>
+                                <option value="manual">Manual</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group" id="manualTrafficGroup" style="display: none;">
+                            <label class="form-label">Traffic Multiplier</label>
+                            <input type="range" class="form-control" id="trafficMultiplier" min="1" max="2" step="0.1" value="1">
+                            <small id="trafficValue">1.0x</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Threshold Mode</label>
+                            <select class="form-control" id="thresholdModeSelect">
+                                <option value="static">Static</option>
+                                <option value="dynamic">Dynamic</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Collections per Day</label>
+                            <input type="number" class="form-control" id="collectionsPerDay" min="1" max="10" value="2">
+                        </div>
+                        
+                        <button class="btn btn-primary" id="saveSettingsBtn">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Advanced Settings</h3>
+                <button class="close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tabs">
+                    <button class="tab active" data-tab="sim-settings">Simulation</button>
+                    <button class="tab" data-tab="opt-settings">Optimization</button>
+                    <button class="tab" data-tab="thresh-settings">Thresholds</button>
+                </div>
+                
+                <div class="tab-content active" id="sim-settings">
+                    <div class="form-group">
+                        <label class="form-label">Auto Optimization</label>
+                        <input type="checkbox" id="autoOptimization" checked>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Auto Bin Filling</label>
+                        <input type="checkbox" id="autoBinFilling" checked>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Truck Breakdown Probability</label>
+                        <input type="range" class="form-control" id="breakdownProbability" min="0" max="0.01" step="0.001" value="0.001">
+                        <small id="breakdownValue">0.001</small>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="opt-settings">
+                    <div class="form-group">
+                        <label class="form-label">VRP Time Limit (seconds)</label>
+                        <input type="number" class="form-control" id="vrpTimeLimit" value="30">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Optimization Algorithm</label>
+                        <select class="form-control" id="optimizationAlgorithm">
+                            <option value="auto">Automatic</option>
+                            <option value="greedy">Greedy</option>
+                            <option value="guided_local_search">Guided Local Search</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="thresh-settings">
+                    <div class="form-group">
+                        <label class="form-label">General Waste Threshold (%)</label>
+                        <input type="number" class="form-control" id="generalThreshold" min="0" max="100" value="80">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Recyclable Threshold (%)</label>
+                        <input type="number" class="form-control" id="recyclableThreshold" min="0" max="100" value="85">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Hazardous Threshold (%)</label>
+                        <input type="number" class="form-control" id="hazardousThreshold" min="0" max="100" value="70">
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-primary" id="saveAdvancedSettings">Save Advanced Settings</button>
+                    <button class="btn btn-danger" id="resetSettings">Reset to Defaults</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- External Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            API_BASE: 'http://localhost:8000/api',
+            SOCKET_URL: 'http://localhost:8000',
+            DEFAULT_CENTER: [31.5204, 74.3587], // Lahore coordinates
+            DEFAULT_ZOOM: 13,
+            UPDATE_INTERVAL: 5000 // 5 seconds
+        };
+
+        // Global state
+        let map;
+        let socket;
+        let markers = {
+            trucks: new Map(),
+            bins: new Map(),
+            depots: new Map()
+        };
+        let routes = new Map();
+        let isPlaying = false;
+        let currentSpeed = 1;
+        let simulationData = {};
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeMap();
+            initializeSocket();
+            initializeEventListeners();
+            initializeTabs();
+            loadInitialData();
+            startDataRefresh();
+        });
+
+        // Map initialization
+        function initializeMap() {
+            map = L.map('map').setView(CONFIG.DEFAULT_CENTER, CONFIG.DEFAULT_ZOOM);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+        }
+
+        // Socket.IO initialization
+        function initializeSocket() {
+            socket = io(CONFIG.SOCKET_URL);
+            
+            socket.on('connect', function() {
+                console.log('Connected to server');
+                showNotification('Connected to Cleanify server', 'success');
+            });
+            
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server');
+                showNotification('Disconnected from server', 'error');
+            });
+            
+            socket.on('simulation_tick', function(data) {
+                updateSimulationData(data);
+            });
+            
+            socket.on('simulation_event', function(event) {
+                addEvent(event);
+            });
+            
+            socket.on('server_message', function(data) {
+                console.log('Server message:', data.msg);
+            });
+        }
+
+        // Event listeners
+        function initializeEventListeners() {
+            // Simulation controls
+            document.getElementById('playPauseBtn').addEventListener('click', togglePlayPause);
+            document.getElementById('stopBtn').addEventListener('click', stopSimulation);
+            document.getElementById('speedSlider').addEventListener('input', updateSpeed);
+            
+            // Buttons
+            document.getElementById('optimizeBtn').addEventListener('click', triggerOptimization);
+            document.getElementById('collectUrgentBtn').addEventListener('click', collectUrgentBins);
+            document.getElementById('clearEventsBtn').addEventListener('click', clearEvents);
+            document.getElementById('clearRoutesBtn').addEventListener('click', clearAllRoutes);
+            document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
+            document.getElementById('closeModal').addEventListener('click', closeSettingsModal);
+            
+            // Settings
+            document.getElementById('trafficMode').addEventListener('change', updateTrafficMode);
+            document.getElementById('trafficMultiplier').addEventListener('input', updateTrafficMultiplier);
+            document.getElementById('thresholdModeSelect').addEventListener('change', updateThresholdMode);
+            document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+            document.getElementById('saveAdvancedSettings').addEventListener('click', saveAdvancedSettings);
+            document.getElementById('resetSettings').addEventListener('click', resetSettings);
+            
+            // Modal click outside to close
+            document.getElementById('settingsModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeSettingsModal();
+                }
+            });
+        }
+
+        // Tab initialization
+        function initializeTabs() {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.dataset.tab;
+                    const container = this.closest('.sidebar');
+                    
+                    // Update tab buttons
+                    container.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update tab content
+                    container.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    container.querySelector(`#${tabName}-tab, #${tabName}`).classList.add('active');
+                });
+            });
+        }
+
+        // API functions
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'API call failed');
+                }
+                
+                return result;
+            } catch (error) {
+                console.error(`API call failed: ${endpoint}`, error);
+                showNotification(`API Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Simulation controls
+        async function togglePlayPause() {
+            try {
+                if (isPlaying) {
+                    await apiCall('/simulation/pause', 'POST');
+                    isPlaying = false;
+                    document.getElementById('playPauseBtn').innerHTML = '<i class="fas fa-play"></i>';
+                    document.getElementById('playPauseBtn').classList.remove('active');
+                } else {
+                    await apiCall('/simulation/start', 'POST');
+                    isPlaying = true;
+                    document.getElementById('playPauseBtn').innerHTML = '<i class="fas fa-pause"></i>';
+                    document.getElementById('playPauseBtn').classList.add('active');
+                }
+            } catch (error) {
+                console.error('Failed to toggle play/pause:', error);
+            }
+        }
+
+        async function stopSimulation() {
+            try {
+                await apiCall('/simulation/stop', 'POST');
+                isPlaying = false;
+                document.getElementById('playPauseBtn').innerHTML = '<i class="fas fa-play"></i>';
+                document.getElementById('playPauseBtn').classList.remove('active');
+            } catch (error) {
+                console.error('Failed to stop simulation:', error);
+            }
+        }
+
+        async function updateSpeed() {
+            const speed = parseInt(document.getElementById('speedSlider').value);
+            currentSpeed = speed;
+            document.getElementById('speedValue').textContent = `${speed}x`;
+            
+            try {
+                await apiCall('/simulation/speed', 'POST', { speed });
+            } catch (error) {
+                console.error('Failed to update speed:', error);
+            }
+        }
+
+        // Data loading functions
+        async function loadInitialData() {
+            try {
+                await Promise.all([
+                    loadTrucks(),
+                    loadBins(),
+                    loadDepots(),
+                    loadRoutes(),
+                    loadSettings(),
+                    loadSimulationStatus()
+                ]);
+            } catch (error) {
+                console.error('Failed to load initial data:', error);
+            }
+        }
+
+        async function loadTrucks() {
+            try {
+                const result = await apiCall('/trucks/');
+                updateTrucksList(result.trucks);
+                updateTrucksOnMap(result.trucks);
+            } catch (error) {
+                console.error('Failed to load trucks:', error);
+            }
+        }
+
+        async function loadBins() {
+            try {
+                const result = await apiCall('/bins/');
+                updateBinsList(result.bins);
+                updateBinsOnMap(result.bins);
+            } catch (error) {
+                console.error('Failed to load bins:', error);
+            }
+        }
+
+        async function loadDepots() {
+            try {
+                // Note: Add depot endpoint when available
+                // For now, create a default depot
+                const depots = [{
+                    id: 'main_depot',
+                    name: 'Main Depot',
+                    location: [74.3587, 31.5204]
+                }];
+                updateDepotsOnMap(depots);
+            } catch (error) {
+                console.error('Failed to load depots:', error);
+            }
+        }
+
+        async function loadRoutes() {
+            try {
+                const result = await apiCall('/optimization/routes');
+                updateRoutesList(result.routes);
+                updateRoutesOnMap(result.routes);
+            } catch (error) {
+                console.error('Failed to load routes:', error);
+            }
+        }
+
+        async function loadSettings() {
+            try {
+                const result = await apiCall('/settings/');
+                updateSettingsUI(result.settings);
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        async function loadSimulationStatus() {
+            try {
+                const result = await apiCall('/simulation/status');
+                updateSimulationStatus(result.status);
+            } catch (error) {
+                console.error('Failed to load simulation status:', error);
+            }
+        }
+
+        // Update functions
+        function updateSimulationData(data) {
+            simulationData = data;
+            
+            // Update time display
+            const timeEl = document.getElementById('timeDisplay');
+            if (data.sim_time) {
+                const date = new Date(data.sim_time);
+                timeEl.textContent = date.toLocaleString();
+            }
+            
+            // Update trucks
+            if (data.trucks) {
+                updateTrucksList(data.trucks);
+                updateTrucksOnMap(data.trucks);
+            }
+            
+            // Update bins
+            if (data.bins) {
+                updateBinsList(data.bins);
+                updateBinsOnMap(data.bins);
+            }
+            
+            // Update statistics
+            if (data.statistics) {
+                updateStatistics(data.statistics);
+            }
+            
+            // Update traffic status
+            if (data.traffic_multiplier) {
+                updateTrafficStatus(data.traffic_multiplier);
+            }
+        }
+
+        function updateTrucksList(trucks) {
+            const container = document.getElementById('trucksList');
+            
+            if (!trucks || trucks.length === 0) {
+                container.innerHTML = '<div class="loading">No trucks available</div>';
+                return;
+            }
+            
+            container.innerHTML = trucks.map(truck => `
+                <div class="list-item" onclick="focusOnMarker('truck', '${truck.id}')">
+                    <div class="item-info">
+                        <div class="item-name">${truck.id}</div>
+                        <div class="item-details">
+                            Load: ${truck.load_percentage.toFixed(1)}% | 
+                            Fuel: ${truck.fuel_level.toFixed(1)}%
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${truck.load_percentage}%"></div>
+                        </div>
+                    </div>
+                    <div class="status-badge status-${truck.status}">${truck.status}</div>
+                </div>
+            `).join('');
+            
+            // Update totals
+            document.getElementById('totalTrucks').textContent = trucks.length;
+            document.getElementById('activeTrucks').textContent = trucks.filter(t => t.is_available).length;
+        }
+
+        function updateBinsList(bins) {
+            const container = document.getElementById('binsList');
+            
+            if (!bins || bins.length === 0) {
+                container.innerHTML = '<div class="loading">No bins available</div>';
+                return;
+            }
+            
+            container.innerHTML = bins.map(bin => `
+                <div class="list-item" onclick="focusOnMarker('bin', '${bin.id}')">
+                    <div class="item-info">
+                        <div class="item-name">${bin.id}</div>
+                        <div class="item-details">
+                            Type: ${bin.type} | 
+                            Fill: ${bin.fill_level.toFixed(1)}%
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${bin.fill_level}%"></div>
+                        </div>
+                    </div>
+                    <div class="status-badge status-${bin.status}">${bin.status}</div>
+                </div>
+            `).join('');
+            
+            // Update totals
+            document.getElementById('totalBins').textContent = bins.length;
+            document.getElementById('urgentBins').textContent = bins.filter(b => b.needs_collection).length;
+        }
+
+        function updateRoutesList(routes) {
+            const container = document.getElementById('routesList');
+            
+            if (!routes || Object.keys(routes).length === 0) {
+                container.innerHTML = '<div class="loading">No active routes</div>';
+                return;
+            }
+            
+            container.innerHTML = Object.values(routes).map(route => `
+                <div class="list-item">
+                    <div class="item-info">
+                        <div class="item-name">${route.truck_id}</div>
+                        <div class="item-details">
+                            Bins: ${route.bin_ids ? route.bin_ids.length : 0} | 
+                            Progress: ${route.route_progress ? route.route_progress.toFixed(1) : 0}%
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${route.route_progress || 0}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateStatistics(stats) {
+            document.getElementById('totalCollections').textContent = stats.total_collections || 0;
+            document.getElementById('totalDistance').textContent = (stats.total_distance || 0).toFixed(1);
+            
+            // Update system status
+            const statusContainer = document.getElementById('systemStatus');
+            statusContainer.innerHTML = `
+                <div style="margin-bottom: 0.5rem;">
+                    <strong>Active Trucks:</strong> ${stats.active_trucks || 0}
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <strong>Bins Needing Collection:</strong> ${stats.bins_needing_collection || 0}
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <strong>Simulation Uptime:</strong> ${formatDuration(stats.simulation_uptime || 0)}
+                </div>
+            `;
+        }
+
+        function updateTrafficStatus(multiplier) {
+            const statusEl = document.getElementById('trafficStatus');
+            if (multiplier <= 1.1) {
+                statusEl.textContent = 'Light';
+                statusEl.style.color = '#28a745';
+            } else if (multiplier <= 1.5) {
+                statusEl.textContent = 'Normal';
+                statusEl.style.color = '#ffc107';
+            } else {
+                statusEl.textContent = 'Heavy';
+                statusEl.style.color = '#dc3545';
+            }
+        }
+
+        function updateSimulationStatus(status) {
+            isPlaying = status.is_running && !status.is_paused;
+            currentSpeed = status.speed || 1;
+            
+            // Update UI
+            const playBtn = document.getElementById('playPauseBtn');
+            if (isPlaying) {
+                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                playBtn.classList.add('active');
+            } else {
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                playBtn.classList.remove('active');
+            }
+            
+            document.getElementById('speedSlider').value = currentSpeed;
+            document.getElementById('speedValue').textContent = `${currentSpeed}x`;
+        }
+
+        function updateSettingsUI(settings) {
+            if (settings.traffic) {
+                document.getElementById('trafficMode').value = settings.traffic.mode;
+                document.getElementById('trafficMultiplier').value = settings.traffic.manual_multiplier || 1.0;
+                document.getElementById('trafficValue').textContent = `${settings.traffic.manual_multiplier || 1.0}x`;
+                toggleManualTrafficControls(settings.traffic.mode === 'manual');
+            }
+            
+            if (settings.threshold) {
+                document.getElementById('thresholdMode').textContent = settings.threshold.mode;
+                document.getElementById('thresholdModeSelect').value = settings.threshold.mode;
+            }
+        }
+
+        // Map update functions
+        // Map update functions
+        function updateTrucksOnMap(trucks) {
+            trucks.forEach(truck => {
+                const [lon, lat] = truck.location;
+                const color = getTruckColor(truck.status);
+                
+                // Store old location for animation
+                const existingMarker = markers.trucks.get(truck.id);
+                const oldLocation = existingMarker ? [existingMarker.getLatLng().lng, existingMarker.getLatLng().lat] : null;
+                
+                if (existingMarker) {
+                    // Update existing marker with animation
+                    const newLocation = [lon, lat];
+                    if (oldLocation && (oldLocation[0] !== lon || oldLocation[1] !== lat)) {
+                        // Animate smooth movement
+                        animateTruckMovement(truck, oldLocation, newLocation);
+                    }
+                    
+                    // Update marker style and popup
+                    existingMarker.setStyle({
+                        radius: 8,
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                } else {
+                    // Create new marker
+                    const marker = L.circleMarker([lat, lon], {
+                        radius: 8,
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).addTo(map);
+                    
+                    markers.trucks.set(truck.id, marker);
+                }
+                
+                // Update popup content
+                const marker = markers.trucks.get(truck.id);
+                marker.bindPopup(`
+                    <strong>${truck.id}</strong><br>
+                    Status: ${truck.status}<br>
+                    Load: ${truck.load_percentage.toFixed(1)}%<br>
+                    Fuel: ${truck.fuel_level.toFixed(1)}%<br>
+                    Speed: ${truck.speed} km/h<br>
+                    Next: ${truck.next_destination || 'None'}
+                `);
+            });
+            
+            // Remove markers for trucks that no longer exist
+            markers.trucks.forEach((marker, truckId) => {
+                if (!trucks.find(t => t.id === truckId)) {
+                    map.removeLayer(marker);
+                    markers.trucks.delete(truckId);
+                }
+            });
+        }
+
+        function updateBinsOnMap(bins) {
+            // Clear existing bin markers
+            markers.bins.forEach(marker => map.removeLayer(marker));
+            markers.bins.clear();
+            
+            bins.forEach(bin => {
+                const [lon, lat] = bin.location;
+                const color = getBinColor(bin.fill_level, bin.needs_collection);
+                
+                const marker = L.circleMarker([lat, lon], {
+                    radius: 6,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.7
+                }).addTo(map);
+                
+                marker.bindPopup(`
+                    <strong>${bin.id}</strong><br>
+                    Type: ${bin.type}<br>
+                    Fill Level: ${bin.fill_level.toFixed(1)}%<br>
+                    Status: ${bin.status}<br>
+                    Needs Collection: ${bin.needs_collection ? 'Yes' : 'No'}
+                `);
+                
+                markers.bins.set(bin.id, marker);
+            });
+        }
+
+        function updateDepotsOnMap(depots) {
+            // Clear existing depot markers
+            markers.depots.forEach(marker => map.removeLayer(marker));
+            markers.depots.clear();
+            
+            depots.forEach(depot => {
+                const [lon, lat] = depot.location;
+                
+                const marker = L.marker([lat, lon], {
+                    icon: L.divIcon({
+                        className: 'depot-marker',
+                        html: '<i class="fas fa-warehouse" style="color: #ffc107; font-size: 20px;"></i>',
+                        iconSize: [25, 25],
+                        iconAnchor: [12, 12]
+                    })
+                }).addTo(map);
+                
+                marker.bindPopup(`
+                    <strong>${depot.name}</strong><br>
+                    ID: ${depot.id}
+                `);
+                
+                markers.depots.set(depot.id, marker);
+            });
+        }
+
+        function updateRoutesOnMap(routesData) {
+            // Clear existing routes
+            routes.forEach(route => map.removeLayer(route));
+            routes.clear();
+            
+            // Add new routes
+            Object.values(routesData).forEach(routeData => {
+                let routePoints = [];
+                
+                // FIXED: Use route_geometry if available (actual road path from OSRM)
+                if (routeData.route_geometry && routeData.route_geometry.length > 0) {
+                    routePoints = routeData.route_geometry; // Already in [lat, lon] format
+                    console.log(`🛣️ Using OSRM route geometry for ${routeData.truck_id}: ${routePoints.length} points`);
+                }
+                // Fallback: Use bin locations (straight lines)
+                else if (routeData.route_details && routeData.route_details.length > 0) {
+                    routePoints = routeData.route_details.map(detail => {
+                        const [lon, lat] = detail.location;
+                        return [lat, lon];
+                    });
+                    console.log(`📍 Using bin locations for ${routeData.truck_id}: ${routePoints.length} points`);
+                }
+                
+                if (routePoints.length > 0) {
+                    const route = L.polyline(routePoints, {
+                        color: getTruckColor(routeData.truck_status || 'en_route'),
+                        weight: 4,           // Slightly thicker for visibility
+                        opacity: 0.8,       // More opaque
+                        dashArray: routeData.route_geometry ? null : '10, 5'  // Dashed if straight line
+                    }).addTo(map);
+                    
+                    // Add tooltip showing route info
+                    route.bindTooltip(`
+                        <strong>Route: ${routeData.truck_id}</strong><br>
+                        Distance: ${(routeData.total_distance || 0).toFixed(1)} km<br>
+                        Type: ${routeData.route_geometry ? 'Road Route' : 'Direct Line'}
+                    `);
+                    
+                    routes.set(routeData.truck_id, route);
+                }
+            });
+        }
+
+        // Action functions
+        async function triggerOptimization() {
+            try {
+                showNotification('Triggering optimization...', 'info');
+                
+                // FIX: Send empty JSON object instead of no body
+                const result = await apiCall('/optimization/optimize', 'POST', {});
+                
+                showNotification('Optimization completed successfully', 'success');
+                await loadRoutes(); // Refresh routes
+            } catch (error) {
+                console.error('Failed to trigger optimization:', error);
+            }
+        }
+
+        async function collectUrgentBins() {
+            try {
+                showNotification('Collecting urgent bins...', 'info');
+                const result = await apiCall('/bins/collect/urgent', 'POST');
+                showNotification('Urgent collection completed', 'success');
+            } catch (error) {
+                console.error('Failed to collect urgent bins:', error);
+            }
+        }
+
+        async function clearEvents() {
+            try {
+                await apiCall('/simulation/events', 'DELETE');
+                document.getElementById('eventsList').innerHTML = '<div class="loading">No events</div>';
+                showNotification('Events cleared', 'success');
+            } catch (error) {
+                console.error('Failed to clear events:', error);
+            }
+        }
+
+        async function clearAllRoutes() {
+            try {
+                await apiCall('/optimization/clear_all_routes', 'POST');
+                showNotification('All routes cleared', 'success');
+                await loadRoutes(); // Refresh routes
+            } catch (error) {
+                console.error('Failed to clear routes:', error);
+            }
+        }
+
+        // Settings functions
+        function updateTrafficMode() {
+            const mode = document.getElementById('trafficMode').value;
+            toggleManualTrafficControls(mode === 'manual');
+        }
+
+        function toggleManualTrafficControls(show) {
+            const group = document.getElementById('manualTrafficGroup');
+            group.style.display = show ? 'block' : 'none';
+        }
+
+        function updateTrafficMultiplier() {
+            const value = document.getElementById('trafficMultiplier').value;
+            document.getElementById('trafficValue').textContent = `${value}x`;
+        }
+
+        async function updateThresholdMode() {
+            const mode = document.getElementById('thresholdModeSelect').value;
+            try {
+                await apiCall('/settings/threshold', 'POST', { mode });
+                document.getElementById('thresholdMode').textContent = mode;
+                showNotification(`Threshold mode set to ${mode}`, 'success');
+            } catch (error) {
+                console.error('Failed to update threshold mode:', error);
+            }
+        }
+
+        async function saveSettings() {
+            try {
+                const trafficMode = document.getElementById('trafficMode').value;
+                const trafficData = { mode: trafficMode };
+                
+                if (trafficMode === 'manual') {
+                    trafficData.manual_multiplier = parseFloat(document.getElementById('trafficMultiplier').value);
+                }
+                
+                await apiCall('/settings/traffic', 'POST', trafficData);
+                
+                const collectionsPerDay = parseInt(document.getElementById('collectionsPerDay').value);
+                await apiCall('/settings/collections_per_day', 'POST', { collections_per_day: collectionsPerDay });
+                
+                showNotification('Settings saved successfully', 'success');
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+            }
+        }
+
+        async function saveAdvancedSettings() {
+            try {
+                const simSettings = {
+                    auto_optimization: document.getElementById('autoOptimization').checked,
+                    auto_bin_filling: document.getElementById('autoBinFilling').checked,
+                    truck_breakdown_probability: parseFloat(document.getElementById('breakdownProbability').value)
+                };
+                
+                await apiCall('/settings/simulation', 'POST', { config: simSettings });
+                
+                const optSettings = {
+                    vrp_time_limit_seconds: parseInt(document.getElementById('vrpTimeLimit').value),
+                    optimization_algorithm: document.getElementById('optimizationAlgorithm').value
+                };
+                
+                await apiCall('/settings/optimization', 'POST', optSettings);
+                
+                const thresholds = {
+                    general: parseFloat(document.getElementById('generalThreshold').value),
+                    recyclable: parseFloat(document.getElementById('recyclableThreshold').value),
+                    hazardous: parseFloat(document.getElementById('hazardousThreshold').value)
+                };
+                
+                await apiCall('/settings/threshold', 'POST', { static_thresholds: thresholds });
+                
+                showNotification('Advanced settings saved successfully', 'success');
+                closeSettingsModal();
+            } catch (error) {
+                console.error('Failed to save advanced settings:', error);
+            }
+        }
+
+        async function resetSettings() {
+            try {
+                await apiCall('/settings/reset', 'POST');
+                showNotification('Settings reset to defaults', 'success');
+                await loadSettings();
+                closeSettingsModal();
+            } catch (error) {
+                console.error('Failed to reset settings:', error);
+            }
+        }
+
+        // Modal functions
+        function openSettingsModal() {
+            document.getElementById('settingsModal').classList.add('show');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('show');
+        }
+
+        // Event handling
+        function addEvent(event) {
+            const container = document.getElementById('eventsList');
+            
+            if (container.querySelector('.loading')) {
+                container.innerHTML = '';
+            }
+            
+            const eventEl = document.createElement('div');
+            eventEl.className = 'event-item';
+            eventEl.innerHTML = `
+                <div class="event-time">${new Date(event.timestamp).toLocaleTimeString()}</div>
+                <div class="event-text">${formatEventText(event)}</div>
+            `;
+            
+            container.insertBefore(eventEl, container.firstChild);
+            
+            // Keep only latest 50 events
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        // Utility functions
+        function getTruckColor(status) {
+            const colors = {
+                'idle': '#6c757d',
+                'en_route': '#007bff',
+                'collecting': '#28a745',
+                'returning': '#ffc107',
+                'maintenance': '#dc3545',
+                'offline': '#343a40'
+            };
+            return colors[status] || '#6c757d';
+        }
+
+        function getBinColor(fillLevel, needsCollection) {
+            if (needsCollection) return '#dc3545';
+            if (fillLevel > 75) return '#ffc107';
+            if (fillLevel > 50) return '#fd7e14';
+            return '#28a745';
+        }
+
+        function formatEventText(event) {
+            const texts = {
+                'bin_collected': `Bin ${event.data.bin_id} collected by truck ${event.data.truck_id}`,
+                'truck_breakdown': `Truck ${event.data.truck_id} broke down`,
+                'bin_overflow': `Bin ${event.data.bin_id} is overflowing`,
+                'optimization_completed': 'Route optimization completed',
+                'simulation_paused': 'Simulation paused',
+                'simulation_resumed': 'Simulation resumed'
+            };
+            return texts[event.type] || `${event.type}: ${JSON.stringify(event.data)}`;
+        }
+
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}h ${minutes}m`;
+        }
+
+        function focusOnMarker(type, id) {
+            const marker = markers[type + 's'].get(id);
+            if (marker) {
+                map.setView(marker.getLatLng(), 15);
+                marker.openPopup();
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div style="font-weight: 500; margin-bottom: 0.25rem;">${type.charAt(0).toUpperCase() + type.slice(1)}</div>
+                <div>${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        // Auto-refresh data
+        function startDataRefresh() {
+            setInterval(async () => {
+                try {
+                    await Promise.all([
+                        loadTrucks(),
+                        loadBins(),
+                        loadRoutes()
+                    ]);
+                } catch (error) {
+                    console.error('Failed to refresh data:', error);
+                }
+            }, CONFIG.UPDATE_INTERVAL);
+        }
+
+        // Enhanced truck movement visualization
+        function animateTruckMovement(truck, oldLocation, newLocation) {
+            const marker = markers.trucks.get(truck.id);
+            if (!marker || !oldLocation || !newLocation) return;
+            
+            // Only animate if truck actually moved
+            const moved = (oldLocation[0] !== newLocation[0] || oldLocation[1] !== newLocation[1]);
+            if (!moved) return;
+            
+            // Smooth animation to new position
+            const duration = 1000; // 1 second animation
+            const startTime = Date.now();
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Interpolate position
+                const lat = oldLocation[1] + (newLocation[1] - oldLocation[1]) * progress;
+                const lon = oldLocation[0] + (newLocation[0] - oldLocation[0]) * progress;
+                
+                marker.setLatLng([lat, lon]);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            animate();
+        }
+    </script>
+</body>
+</html>

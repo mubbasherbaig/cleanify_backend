@@ -13,57 +13,63 @@ bp = Blueprint("optimization", __name__)
 logger = logging.getLogger(__name__)
 
 
+# Replace the trigger_optimization() function in optimization.py with this debug version:
+
 @bp.route("/optimize", methods=["POST"])
 def trigger_optimization():
-    """Trigger full optimization for all available trucks and bins"""
+    """Trigger full optimization for all available trucks and bins - DEBUG VERSION"""
     try:
+        logger.info("🚀 Starting optimization...")
         data = request.get_json() or {}
         
-        # Get optional filters
-        truck_ids = data.get("truck_ids")  # Specific trucks to optimize
-        bin_ids = data.get("bin_ids")      # Specific bins to include
-        force_all_bins = data.get("force_all_bins", False)  # Include all bins regardless of threshold
+        # Debug: Check simulation service
+        if not simulation_service:
+            logger.error("❌ simulation_service is None")
+            return jsonify({"success": False, "error": "Simulation service not available"}), 500
         
-        # Get trucks to optimize
-        trucks_to_optimize = simulation_service.trucks
-        if truck_ids:
-            trucks_to_optimize = [
-                t for t in simulation_service.trucks 
-                if t.id in truck_ids and t.is_available()
-            ]
-        else:
-            trucks_to_optimize = [t for t in simulation_service.trucks if t.is_available()]
+        logger.info(f"✅ Simulation service available")
         
-        if not trucks_to_optimize:
+        # Debug: Check trucks
+        logger.info(f"📊 Total trucks: {len(simulation_service.trucks)}")
+        available_trucks = [t for t in simulation_service.trucks if t.is_available()]
+        logger.info(f"📊 Available trucks: {len(available_trucks)}")
+        
+        if not available_trucks:
+            logger.warning("⚠️ No available trucks")
             return jsonify({
                 "success": False,
                 "error": "No available trucks for optimization"
             }), 400
         
-        # Get bins to include
+        # Debug: Check trucks status
+        for truck in simulation_service.trucks:
+            logger.info(f"🚛 Truck {truck.id}: status={truck.status}, available={truck.is_available()}")
+        
+        # Debug: Check bins
+        logger.info(f"📊 Total bins: {len(simulation_service.bins)}")
+        
         bins_to_include = []
-        if bin_ids:
-            # Use specific bins
-            bins_to_include = [
-                b for b in simulation_service.bins 
-                if b.id in bin_ids and b.status == BinStatus.ACTIVE
-            ]
-        elif force_all_bins:
-            # Use all active bins
-            bins_to_include = [
-                b for b in simulation_service.bins 
-                if b.status == BinStatus.ACTIVE
-            ]
-        else:
-            # Use only bins that need collection
-            bins_to_include = []
-            for bin_obj in simulation_service.bins:
-                if bin_obj.status == BinStatus.ACTIVE:
+        for bin_obj in simulation_service.bins:
+            logger.info(f"🗑️ Bin {bin_obj.id}: status={bin_obj.status}, fill={bin_obj.fill_level}%")
+            
+            if bin_obj.status.value == "active":  # Use .value to be safe
+                try:
                     threshold = simulation_service.threshold_service.threshold_for(bin_obj)
+                    logger.info(f"🎯 Bin {bin_obj.id}: threshold={threshold}%")
+                    
                     if bin_obj.fill_level >= threshold:
                         bins_to_include.append(bin_obj)
+                        logger.info(f"✅ Bin {bin_obj.id} needs collection")
+                    else:
+                        logger.info(f"⏳ Bin {bin_obj.id} not ready yet")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error checking threshold for bin {bin_obj.id}: {e}")
+        
+        logger.info(f"📊 Bins needing collection: {len(bins_to_include)}")
         
         if not bins_to_include:
+            logger.info("ℹ️ No bins need collection")
             return jsonify({
                 "success": True,
                 "message": "No bins need collection at this time",
@@ -74,23 +80,47 @@ def trigger_optimization():
                 }
             })
         
-        # Trigger optimization
-        result = simulation_service.optimization_svc.full_reoptimize(
-            trucks_to_optimize, bins_to_include
-        )
+        # Debug: Check optimization service
+        if not simulation_service.optimization_svc:
+            logger.error("❌ optimization_svc is None")
+            return jsonify({"success": False, "error": "Optimization service not available"}), 500
+        
+        logger.info("✅ About to call full_reoptimize...")
+        
+        # Try the optimization with detailed error handling
+        try:
+            result = simulation_service.optimization_svc.full_reoptimize(
+                available_trucks, bins_to_include
+            )
+            logger.info(f"✅ Optimization completed: {result}")
+            
+        except Exception as opt_error:
+            logger.error(f"❌ Optimization failed: {type(opt_error).__name__}: {opt_error}")
+            import traceback
+            logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
+            return jsonify({
+                "success": False, 
+                "error": f"Optimization failed: {str(opt_error)}",
+                "error_type": type(opt_error).__name__
+            }), 500
         
         return jsonify({
             "success": True,
-            "message": f"Optimization completed for {len(trucks_to_optimize)} trucks and {len(bins_to_include)} bins",
+            "message": f"Optimization completed for {len(available_trucks)} trucks and {len(bins_to_include)} bins",
             "optimization_result": result,
-            "trucks_optimized": len(trucks_to_optimize),
+            "trucks_optimized": len(available_trucks),
             "bins_considered": len(bins_to_include)
         })
         
     except Exception as e:
-        logger.error(f"Optimization failed: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
+        logger.error(f"❌ Route error: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
+        return jsonify({
+            "success": False, 
+            "error": str(e),
+            "error_type": type(e).__name__
+        }), 500
 
 @bp.route("/optimize/urgent", methods=["POST"])
 def optimize_urgent():
@@ -156,6 +186,39 @@ def get_current_routes():
                             "estimated_load": (bin_obj.fill_level / 100.0) * bin_obj.capacity
                         })
                 
+                # ADDED: Generate route geometry using OSRM
+                route_geometry = []
+                if route_details and len(route_details) > 0:
+                    try:
+                        # Build coordinate list: depot -> bins -> depot
+                        coordinates = [truck.depot_location]
+                        coordinates.extend([detail["location"] for detail in route_details])
+                        coordinates.append(truck.depot_location)
+                        
+                        # Get route geometry from OSRM
+                        if simulation_service.optimization_svc.osrm_service:
+                            route_result = simulation_service.optimization_svc.osrm_service.route(
+                                coordinates,
+                                options={
+                                    'overview': 'full',
+                                    'geometries': 'geojson'
+                                }
+                            )
+                            
+                            if 'routes' in route_result and route_result['routes']:
+                                geometry = route_result['routes'][0].get('geometry', {})
+                                if 'coordinates' in geometry:
+                                    # Convert [lon, lat] to [lat, lon] for Leaflet
+                                    route_geometry = [[coord[1], coord[0]] for coord in geometry['coordinates']]
+                                    
+                    except Exception as e:
+                        logger.warning(f"Failed to get route geometry for truck {truck.id}: {e}")
+                        # Fallback to straight lines
+                        coordinates = [truck.depot_location]
+                        coordinates.extend([detail["location"] for detail in route_details])
+                        coordinates.append(truck.depot_location)
+                        route_geometry = [[coord[1], coord[0]] for coord in coordinates]
+                
                 routes[truck.id] = {
                     "truck_id": truck.id,
                     "status": truck.status.value,
@@ -166,6 +229,7 @@ def get_current_routes():
                     "current_route_index": truck.current_route_index,
                     "next_destination": truck.get_next_destination(),
                     "route_details": route_details,
+                    "route_geometry": route_geometry,  # NEW: Actual road geometry
                     "estimated_total_load": sum(
                         detail["estimated_load"] for detail in route_details
                     ),
@@ -186,7 +250,6 @@ def get_current_routes():
     except Exception as e:
         logger.error(f"Failed to get current routes: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 @bp.route("/routes/<truck_id>", methods=["GET"])
 def get_truck_route(truck_id: str):

@@ -51,9 +51,9 @@ class Bin:
         return self.fill_level >= 100
     
     def needs_collection(self, dynamic_threshold: float = None) -> bool:
-        """Check if bin needs collection based on threshold"""
         threshold = dynamic_threshold if dynamic_threshold is not None else self.static_threshold
-        return self.fill_level >= threshold and self.status == BinStatus.ACTIVE
+        return (self.fill_level >= threshold and 
+                self.status in [BinStatus.ACTIVE, BinStatus.FULL])
     
     def collect(self) -> float:
         """Simulate collection - returns amount collected"""
@@ -144,7 +144,7 @@ class Bin:
             capacity=data.get("capacity", 100.0),
             status=BinStatus(data.get("status", "active")),
             last_collected=datetime.fromisoformat(data.get("last_collected", datetime.now().isoformat())),
-            fill_rate=data.get("fill_rate", 5.0),
+            fill_rate=data.get("fill_rate", 15.0),
             priority=data.get("priority", 1),
             created_at=datetime.fromisoformat(data.get("created_at", datetime.now().isoformat())),
             updated_at=datetime.fromisoformat(data.get("updated_at", datetime.now().isoformat()))
