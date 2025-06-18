@@ -1,11 +1,11 @@
 """
-Trigger manual optimization, return route JSON.
-Keep route functions thin - delegate to optimization service.
+Enhanced optimization routes with auto/manual mode support.
 """
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.local import LocalProxy
 from typing import Dict, Any, List
 import logging
+from datetime import datetime, timedelta
 simulation_service = LocalProxy(lambda: current_app.simulation_service)
 from cleanify.core.models.bin import BinStatus
 
@@ -13,126 +13,142 @@ bp = Blueprint("optimization", __name__)
 logger = logging.getLogger(__name__)
 
 
-# Replace the trigger_optimization() function in optimization.py with this debug version:
-
-@bp.route("/optimize", methods=["POST"])
-def trigger_optimization():
-    """Trigger full optimization for all available trucks and bins - DEBUG VERSION"""
+@bp.route("/mode", methods=["GET"])
+def get_optimization_mode():
+    """Get current optimization mode (auto/manual)"""
     try:
-        logger.info("🚀 Starting optimization...")
-        data = request.get_json() or {}
-        
-        # Debug: Check simulation service
-        if not simulation_service:
-            logger.error("❌ simulation_service is None")
-            return jsonify({"success": False, "error": "Simulation service not available"}), 500
-        
-        logger.info(f"✅ Simulation service available")
-        
-        # Debug: Check trucks
-        logger.info(f"📊 Total trucks: {len(simulation_service.trucks)}")
-        available_trucks = [t for t in simulation_service.trucks if t.is_available()]
-        logger.info(f"📊 Available trucks: {len(available_trucks)}")
-        
-        if not available_trucks:
-            logger.warning("⚠️ No available trucks")
-            return jsonify({
-                "success": False,
-                "error": "No available trucks for optimization"
-            }), 400
-        
-        # Debug: Check trucks status
-        for truck in simulation_service.trucks:
-            logger.info(f"🚛 Truck {truck.id}: status={truck.status}, available={truck.is_available()}")
-        
-        # Debug: Check bins
-        logger.info(f"📊 Total bins: {len(simulation_service.bins)}")
-        
-        bins_to_include = []
-        for bin_obj in simulation_service.bins:
-            logger.info(f"🗑️ Bin {bin_obj.id}: status={bin_obj.status}, fill={bin_obj.fill_level}%")
-            
-            if bin_obj.status.value == "active":  # Use .value to be safe
-                try:
-                    threshold = simulation_service.threshold_service.threshold_for(bin_obj)
-                    logger.info(f"🎯 Bin {bin_obj.id}: threshold={threshold}%")
-                    
-                    if bin_obj.fill_level >= threshold:
-                        bins_to_include.append(bin_obj)
-                        logger.info(f"✅ Bin {bin_obj.id} needs collection")
-                    else:
-                        logger.info(f"⏳ Bin {bin_obj.id} not ready yet")
-                        
-                except Exception as e:
-                    logger.error(f"❌ Error checking threshold for bin {bin_obj.id}: {e}")
-        
-        logger.info(f"📊 Bins needing collection: {len(bins_to_include)}")
-        
-        if not bins_to_include:
-            logger.info("ℹ️ No bins need collection")
-            return jsonify({
-                "success": True,
-                "message": "No bins need collection at this time",
-                "optimization_result": {
-                    "routes": {},
-                    "bins_assigned": 0,
-                    "trucks_used": 0
-                }
-            })
-        
-        # Debug: Check optimization service
-        if not simulation_service.optimization_svc:
-            logger.error("❌ optimization_svc is None")
-            return jsonify({"success": False, "error": "Optimization service not available"}), 500
-        
-        logger.info("✅ About to call full_reoptimize...")
-        
-        # Try the optimization with detailed error handling
-        try:
-            result = simulation_service.optimization_svc.full_reoptimize(
-                available_trucks, bins_to_include
-            )
-            logger.info(f"✅ Optimization completed: {result}")
-            
-        except Exception as opt_error:
-            logger.error(f"❌ Optimization failed: {type(opt_error).__name__}: {opt_error}")
-            import traceback
-            logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
-            return jsonify({
-                "success": False, 
-                "error": f"Optimization failed: {str(opt_error)}",
-                "error_type": type(opt_error).__name__
-            }), 500
+        mode = simulation_service.config.get("optimization_mode", "auto")
+        auto_config = {
+            "interval_minutes": simulation_service.config.get("auto_optimization_interval_minutes", 5),
+            "urgent_threshold": simulation_service.config.get("urgent_bin_threshold", 90.0)
+        }
         
         return jsonify({
             "success": True,
-            "message": f"Optimization completed for {len(available_trucks)} trucks and {len(bins_to_include)} bins",
-            "optimization_result": result,
-            "trucks_optimized": len(available_trucks),
-            "bins_considered": len(bins_to_include)
+            "mode": mode,
+            "auto_config": auto_config,
+            "is_auto": mode == "auto"
         })
         
     except Exception as e:
-        logger.error(f"❌ Route error: {type(e).__name__}: {e}")
-        import traceback
-        logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
+        logger.error(f"Failed to get optimization mode: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route("/mode", methods=["POST"])
+def set_optimization_mode():
+    """Set optimization mode (auto/manual)"""
+    try:
+        data = request.get_json()
+        
+        if not data or "mode" not in data:
+            return jsonify({"success": False, "error": "Mode not provided"}), 400
+        
+        mode = data["mode"]
+        
+        if mode not in ["auto", "manual"]:
+            return jsonify({"success": False, "error": "Mode must be 'auto' or 'manual'"}), 400
+        
+        # Set the mode
+        simulation_service.set_optimization_mode(mode)
+        
+        # Configure auto-optimization if provided
+        if mode == "auto" and "auto_config" in data:
+            auto_config = data["auto_config"]
+            interval = auto_config.get("interval_minutes", 5)
+            threshold = auto_config.get("urgent_threshold", 90.0)
+            simulation_service.configure_auto_optimization(interval, threshold)
+        
+        return jsonify({
+            "success": True,
+            "message": f"Optimization mode set to {mode}",
+            "mode": mode,
+            "config": simulation_service.config
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to set optimization mode: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route("/optimize", methods=["POST"])
+def trigger_optimization():
+    """Trigger optimization (manual mode) or force optimization (auto mode)"""
+    try:
+        logger.info("🚀 Optimization triggered...")
+        data = request.get_json() or {}
+        
+        current_mode = simulation_service.config.get("optimization_mode", "auto")
+        
+        if current_mode == "manual":
+            # Manual optimization
+            result = simulation_service.trigger_manual_optimization()
+            message = "Manual optimization completed"
+        else:
+            # Force optimization in auto mode
+            available_trucks = [t for t in simulation_service.trucks if t.is_available()]
+            bins_needing_collection = simulation_service._get_bins_needing_collection()
+            
+            if not available_trucks:
+                return jsonify({
+                    "success": False,
+                    "error": "No available trucks for optimization"
+                }), 400
+            
+            if not bins_needing_collection:
+                return jsonify({
+                    "success": True,
+                    "message": "No bins need collection at this time",
+                    "optimization_result": {
+                        "routes": {},
+                        "bins_assigned": 0,
+                        "trucks_used": 0
+                    }
+                })
+            
+            result = simulation_service.optimization_svc.full_reoptimize(
+                available_trucks, bins_needing_collection
+            )
+            
+            # Store route geometries for trucks
+            if result.get("success") and "routes" in result:
+                for truck_id, route_data in result["routes"].items():
+                    if "route_geometry" in route_data:
+                        simulation_service.truck_routes_geometry[truck_id] = route_data["route_geometry"]
+            
+            message = "Forced optimization completed (auto mode)"
+        
+        if result.get("success"):
+            return jsonify({
+                "success": True,
+                "message": message,
+                "optimization_result": result,
+                "mode": current_mode,
+                "trucks_optimized": result.get("trucks_used", 0),
+                "bins_considered": result.get("bins_assigned", 0)
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": result.get("error", "Optimization failed"),
+                "mode": current_mode
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"❌ Optimization error: {type(e).__name__}: {e}")
         return jsonify({
             "success": False, 
             "error": str(e),
             "error_type": type(e).__name__
         }), 500
 
+
 @bp.route("/optimize/urgent", methods=["POST"])
 def optimize_urgent():
     """Optimize only for urgent bins (above threshold)"""
     try:
         # Find urgent bins
-        urgent_bins = []
-        for bin_obj in simulation_service.bins:
-            if bin_obj.status == BinStatus.ACTIVE:
-                threshold = simulation_service.threshold_service.threshold_for(bin_obj)
-                if bin_obj.fill_level >= threshold:
-                    urgent_bins.append(bin_obj)
+        urgent_bins = simulation_service._get_urgent_bins()
         
         if not urgent_bins:
             return jsonify({
@@ -154,6 +170,12 @@ def optimize_urgent():
             available_trucks, urgent_bins
         )
         
+        # Store route geometries
+        if result.get("success") and "routes" in result:
+            for truck_id, route_data in result["routes"].items():
+                if "route_geometry" in route_data:
+                    simulation_service.truck_routes_geometry[truck_id] = route_data["route_geometry"]
+        
         return jsonify({
             "success": True,
             "message": f"Urgent optimization completed for {len(urgent_bins)} bins",
@@ -168,7 +190,7 @@ def optimize_urgent():
 
 @bp.route("/routes", methods=["GET"])
 def get_current_routes():
-    """Get current routes for all trucks"""
+    """Get current routes for all trucks with enhanced geometry support"""
     try:
         routes = {}
         
@@ -186,9 +208,11 @@ def get_current_routes():
                             "estimated_load": (bin_obj.fill_level / 100.0) * bin_obj.capacity
                         })
                 
-                # ADDED: Generate route geometry using OSRM
-                route_geometry = []
-                if route_details and len(route_details) > 0:
+                # Get stored route geometry
+                route_geometry = simulation_service.get_route_geometry(truck.id)
+                
+                # If no stored geometry, try to generate it
+                if not route_geometry and route_details and len(route_details) > 0:
                     try:
                         # Build coordinate list: depot -> bins -> depot
                         coordinates = [truck.depot_location]
@@ -208,8 +232,10 @@ def get_current_routes():
                             if 'routes' in route_result and route_result['routes']:
                                 geometry = route_result['routes'][0].get('geometry', {})
                                 if 'coordinates' in geometry:
-                                    # Convert [lon, lat] to [lat, lon] for Leaflet
+                                    # Convert [lon, lat] to [lat, lon] for frontend
                                     route_geometry = [[coord[1], coord[0]] for coord in geometry['coordinates']]
+                                    # Store for future use
+                                    simulation_service.truck_routes_geometry[truck.id] = route_geometry
                                     
                     except Exception as e:
                         logger.warning(f"Failed to get route geometry for truck {truck.id}: {e}")
@@ -229,14 +255,15 @@ def get_current_routes():
                     "current_route_index": truck.current_route_index,
                     "next_destination": truck.get_next_destination(),
                     "route_details": route_details,
-                    "route_geometry": route_geometry,  # NEW: Actual road geometry
+                    "route_geometry": route_geometry,
                     "estimated_total_load": sum(
                         detail["estimated_load"] for detail in route_details
                     ),
                     "route_progress": (
                         truck.current_route_index / max(1, len(truck.route)) * 100
                         if truck.route else 0
-                    )
+                    ),
+                    "has_osrm_geometry": len(route_geometry) > len(route_details) + 2 if route_geometry else False
                 }
         
         return jsonify({
@@ -244,12 +271,14 @@ def get_current_routes():
             "routes": routes,
             "total_trucks": len(simulation_service.trucks),
             "trucks_with_routes": len(routes),
-            "active_routes": len([r for r in routes.values() if r["route"]])
+            "active_routes": len([r for r in routes.values() if r["route"]]),
+            "optimization_mode": simulation_service.config.get("optimization_mode", "auto")
         })
         
     except Exception as e:
         logger.error(f"Failed to get current routes: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 @bp.route("/routes/<truck_id>", methods=["GET"])
 def get_truck_route(truck_id: str):
@@ -332,6 +361,9 @@ def get_truck_route(truck_id: str):
             traffic_mult = simulation_service.traffic_service.current_multiplier()
             estimated_time = (total_estimated_distance / truck.speed * 60) * traffic_mult
         
+        # Get route geometry
+        route_geometry = simulation_service.get_route_geometry(truck_id)
+        
         return jsonify({
             "success": True,
             "truck_id": truck_id,
@@ -345,6 +377,7 @@ def get_truck_route(truck_id: str):
                 "current_route_index": truck.current_route_index,
                 "next_destination": truck.get_next_destination(),
                 "route_details": route_details,
+                "route_geometry": route_geometry,
                 "route_summary": {
                     "total_bins": len(truck.route),
                     "completed_bins": truck.current_route_index,
@@ -358,7 +391,8 @@ def get_truck_route(truck_id: str):
                     ),
                     "route_progress": (
                         truck.current_route_index / max(1, len(truck.route)) * 100
-                    )
+                    ),
+                    "has_osrm_geometry": len(route_geometry) > len(route_details) + 2 if route_geometry else False
                 },
                 "return_to_depot_distance": final_distance
             }
@@ -366,6 +400,134 @@ def get_truck_route(truck_id: str):
         
     except Exception as e:
         logger.error(f"Failed to get route for truck {truck_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route("/auto_config", methods=["GET"])
+def get_auto_optimization_config():
+    """Get auto-optimization configuration"""
+    try:
+        config = {
+            "enabled": simulation_service.config.get("optimization_mode") == "auto",
+            "interval_minutes": simulation_service.config.get("auto_optimization_interval_minutes", 5),
+            "urgent_threshold": simulation_service.config.get("urgent_bin_threshold", 90.0),
+            "last_optimization": getattr(simulation_service, 'last_auto_optimization', datetime.now()).isoformat(),
+            "next_scheduled": None
+        }
+        
+        # Calculate next scheduled optimization
+        if config["enabled"]:
+            from datetime import datetime, timedelta
+            try:
+                last_opt = simulation_service.last_auto_optimization
+                next_opt = last_opt + timedelta(minutes=config["interval_minutes"])
+                config["next_scheduled"] = next_opt.isoformat()
+            except (AttributeError, TypeError):
+                # Handle case where last_auto_optimization is not set
+                config["next_scheduled"] = None
+        
+        return jsonify({
+            "success": True,
+            "auto_optimization": config
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get auto-optimization config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route("/auto_config", methods=["POST"])
+def update_auto_optimization_config():
+    """Update auto-optimization configuration"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"success": False, "error": "No configuration provided"}), 400
+        
+        interval = data.get("interval_minutes", 5)
+        threshold = data.get("urgent_threshold", 90.0)
+        
+        if not (1 <= interval <= 60):
+            return jsonify({"success": False, "error": "Interval must be between 1 and 60 minutes"}), 400
+        
+        if not (50 <= threshold <= 100):
+            return jsonify({"success": False, "error": "Urgent threshold must be between 50 and 100"}), 400
+        
+        simulation_service.configure_auto_optimization(interval, threshold)
+        
+        return jsonify({
+            "success": True,
+            "message": "Auto-optimization configuration updated",
+            "config": {
+                "interval_minutes": interval,
+                "urgent_threshold": threshold
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to update auto-optimization config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route("/status", methods=["GET"])
+def get_optimization_status():
+    """Get comprehensive optimization status"""
+    try:
+        current_mode = simulation_service.config.get("optimization_mode", "auto")
+        
+        # Get basic stats
+        available_trucks = [t for t in simulation_service.trucks if t.is_available()]
+        trucks_with_routes = [t for t in simulation_service.trucks if t.route]
+        bins_needing_collection = simulation_service._get_bins_needing_collection()
+        urgent_bins = simulation_service._get_urgent_bins()
+        
+        # Get last optimization info
+        last_optimization = getattr(simulation_service, 'last_auto_optimization', None)
+        
+        status = {
+            "mode": current_mode,
+            "is_auto": current_mode == "auto",
+            "trucks": {
+                "total": len(simulation_service.trucks),
+                "available": len(available_trucks),
+                "with_routes": len(trucks_with_routes),
+                "utilization": len(trucks_with_routes) / max(1, len(available_trucks)) * 100
+            },
+            "bins": {
+                "total": len(simulation_service.bins),
+                "needing_collection": len(bins_needing_collection),
+                "urgent": len(urgent_bins),
+                "urgent_threshold": simulation_service.config.get("urgent_bin_threshold", 90.0)
+            },
+            "optimization": {
+                "last_run": last_optimization.isoformat() if last_optimization else None,
+                "auto_interval_minutes": simulation_service.config.get("auto_optimization_interval_minutes", 5),
+                "routes_with_geometry": len([
+                    truck_id for truck_id in simulation_service.truck_routes_geometry 
+                    if simulation_service.truck_routes_geometry[truck_id]
+                ])
+            }
+        }
+        
+        # Add next scheduled optimization for auto mode
+        if current_mode == "auto" and last_optimization:
+            try:
+                from datetime import timedelta
+                next_scheduled = last_optimization + timedelta(
+                    minutes=simulation_service.config.get("auto_optimization_interval_minutes", 5)
+                )
+                status["optimization"]["next_scheduled"] = next_scheduled.isoformat()
+            except (AttributeError, TypeError):
+                status["optimization"]["next_scheduled"] = None
+        
+        return jsonify({
+            "success": True,
+            "status": status
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get optimization status: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -379,12 +541,7 @@ def get_optimization_statistics():
         available_trucks = len([t for t in simulation_service.trucks if t.is_available()])
         trucks_with_routes = len([t for t in simulation_service.trucks if t.route])
         
-        urgent_bins = []
-        for bin_obj in simulation_service.bins:
-            if bin_obj.status.value == "active":
-                threshold = simulation_service.threshold_service.threshold_for(bin_obj)
-                if bin_obj.fill_level >= threshold:
-                    urgent_bins.append(bin_obj.id)
+        urgent_bins = simulation_service._get_urgent_bins()
         
         stats["current_state"] = {
             "available_trucks": available_trucks,
@@ -394,7 +551,8 @@ def get_optimization_statistics():
             "optimization_efficiency": (
                 trucks_with_routes / max(1, available_trucks) * 100
                 if available_trucks > 0 else 0
-            )
+            ),
+            "optimization_mode": simulation_service.config.get("optimization_mode", "auto")
         }
         
         return jsonify({
@@ -412,6 +570,15 @@ def get_optimization_config():
     """Get current optimization configuration"""
     try:
         config = simulation_service.optimization_svc.config.copy()
+        
+        # Add simulation-level optimization config
+        config.update({
+            "optimization_mode": simulation_service.config.get("optimization_mode", "auto"),
+            "auto_optimization_interval_minutes": simulation_service.config.get("auto_optimization_interval_minutes", 5),
+            "urgent_bin_threshold": simulation_service.config.get("urgent_bin_threshold", 90.0),
+            "use_osrm_routes": simulation_service.config.get("use_osrm_routes", True),
+            "route_following_precision": simulation_service.config.get("route_following_precision", 0.01)
+        })
         
         return jsonify({
             "success": True,
@@ -432,24 +599,28 @@ def update_optimization_config():
         if not data:
             return jsonify({"success": False, "error": "No configuration data provided"}), 400
         
-        # Validate configuration values
-        valid_keys = simulation_service.optimization_svc.config.keys()
-        invalid_keys = [k for k in data.keys() if k not in valid_keys]
+        # Update optimization service config
+        opt_service_config = {k: v for k, v in data.items() 
+                            if k in simulation_service.optimization_svc.config}
+        if opt_service_config:
+            simulation_service.optimization_svc.configure(opt_service_config)
         
-        if invalid_keys:
-            return jsonify({
-                "success": False,
-                "error": f"Invalid configuration keys: {invalid_keys}",
-                "valid_keys": list(valid_keys)
-            }), 400
-        
-        # Apply configuration
-        simulation_service.optimization_svc.configure(data)
+        # Update simulation-level config
+        sim_config = {k: v for k, v in data.items() 
+                     if k in ["optimization_mode", "auto_optimization_interval_minutes", 
+                             "urgent_bin_threshold", "use_osrm_routes", "route_following_precision"]}
+        if sim_config:
+            simulation_service.configure(sim_config)
         
         return jsonify({
             "success": True,
             "message": "Optimization configuration updated",
-            "updated_config": simulation_service.optimization_svc.config.copy()
+            "updated_config": {
+                **simulation_service.optimization_svc.config,
+                "optimization_mode": simulation_service.config.get("optimization_mode", "auto"),
+                "auto_optimization_interval_minutes": simulation_service.config.get("auto_optimization_interval_minutes", 5),
+                "urgent_bin_threshold": simulation_service.config.get("urgent_bin_threshold", 90.0)
+            }
         })
         
     except Exception as e:
@@ -457,13 +628,38 @@ def update_optimization_config():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@bp.route("/clear_all_routes", methods=["POST"])
+def clear_all_routes():
+    """Clear all truck routes and route geometries"""
+    try:
+        cleared_count = 0
+        
+        for truck in simulation_service.trucks:
+            if truck.route:
+                truck.assign_route([])
+                cleared_count += 1
+        
+        # Clear route geometries
+        simulation_service.truck_routes_geometry.clear()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Cleared routes for {cleared_count} trucks",
+            "trucks_cleared": cleared_count
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to clear all routes: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# Keep all existing endpoints...
 @bp.route("/analyze", methods=["POST"])
 def analyze_optimization():
     """Analyze optimization possibilities without applying changes"""
     try:
         data = request.get_json() or {}
         
-        # Get trucks and bins to analyze
         truck_ids = data.get("truck_ids")
         bin_ids = data.get("bin_ids")
         
@@ -475,18 +671,15 @@ def analyze_optimization():
         if bin_ids:
             bins_to_analyze = [b for b in simulation_service.bins if b.id in bin_ids]
         
-        # Filter to available trucks and active bins
         available_trucks = [t for t in trucks_to_analyze if t.is_available()]
         active_bins = [b for b in bins_to_analyze if b.status.value == "active"]
         
-        # Get bins that need collection
         urgent_bins = []
         for bin_obj in active_bins:
             threshold = simulation_service.threshold_service.threshold_for(bin_obj)
             if bin_obj.fill_level >= threshold:
                 urgent_bins.append(bin_obj)
         
-        # Analyze capacity allocation without optimizing
         if urgent_bins and available_trucks:
             allocation_result = simulation_service.optimization_svc._allocate_bins_to_trucks(
                 available_trucks, urgent_bins
@@ -494,7 +687,6 @@ def analyze_optimization():
         else:
             allocation_result = {"allocations": {}, "total_bins_allocated": 0}
         
-        # Calculate potential improvements
         current_efficiency = 0
         if available_trucks:
             trucks_with_work = len([t for t in available_trucks if t.route])
@@ -521,7 +713,8 @@ def analyze_optimization():
                 "current_state": {
                     "trucks_with_routes": len([t for t in available_trucks if t.route]),
                     "current_efficiency": round(current_efficiency, 2),
-                    "total_current_load": sum(t.load for t in available_trucks)
+                    "total_current_load": sum(t.load for t in available_trucks),
+                    "optimization_mode": simulation_service.config.get("optimization_mode", "auto")
                 },
                 "optimization_potential": {
                     "bins_that_could_be_assigned": allocation_result["total_bins_allocated"],
@@ -562,7 +755,6 @@ def _generate_optimization_recommendations(trucks, bins, allocation_result):
         })
         return recommendations
     
-    # Check for underutilized trucks
     underutilized = [
         t for t in trucks 
         if not t.route and t.is_available()
@@ -574,7 +766,6 @@ def _generate_optimization_recommendations(trucks, bins, allocation_result):
             "message": f"{len(underutilized)} trucks are idle and could be assigned routes"
         })
     
-    # Check for capacity issues
     total_bin_load = sum((b.fill_level / 100.0) * b.capacity for b in bins)
     total_truck_capacity = sum(t.capacity - t.load for t in trucks)
     
@@ -584,7 +775,6 @@ def _generate_optimization_recommendations(trucks, bins, allocation_result):
             "message": "Total bin load exceeds available truck capacity"
         })
     
-    # Check allocation efficiency
     assigned_bins = allocation_result["total_bins_allocated"]
     if assigned_bins < len(bins):
         unassigned = len(bins) - assigned_bins
@@ -596,40 +786,16 @@ def _generate_optimization_recommendations(trucks, bins, allocation_result):
     return recommendations
 
 
-@bp.route("/clear_all_routes", methods=["POST"])
-def clear_all_routes():
-    """Clear all truck routes"""
-    try:
-        cleared_count = 0
-        
-        for truck in simulation_service.trucks:
-            if truck.route:
-                truck.assign_route([])
-                cleared_count += 1
-        
-        return jsonify({
-            "success": True,
-            "message": f"Cleared routes for {cleared_count} trucks",
-            "trucks_cleared": cleared_count
-        })
-        
-    except Exception as e:
-        logger.error(f"Failed to clear all routes: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
 @bp.route("/test_algorithms", methods=["POST"])
 def test_optimization_algorithms():
     """Test different optimization algorithms and compare results"""
     try:
         data = request.get_json() or {}
         
-        # Get test parameters
         algorithm_list = data.get("algorithms", ["greedy", "dp"])
         test_bins_count = data.get("test_bins_count", 10)
         
-        # Get test data
-        available_trucks = [t for t in simulation_service.trucks if t.is_available()][:3]  # Limit for testing
+        available_trucks = [t for t in simulation_service.trucks if t.is_available()][:3]
         test_bins = [
             b for b in simulation_service.bins 
             if b.status.value == "active"
@@ -645,13 +811,11 @@ def test_optimization_algorithms():
         
         for algorithm in algorithm_list:
             try:
-                # Test knapsack algorithm
                 from cleanify.core.services.knapsack import KnapsackSolver, BinKnapsackOptimizer
                 
                 solver = KnapsackSolver()
                 optimizer = BinKnapsackOptimizer(solver)
                 
-                # Run optimization
                 import time
                 start_time = time.perf_counter()
                 

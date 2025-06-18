@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cleanify - Waste Management System</title>
+    <title>Cleanify - Advanced Waste Management System</title>
     
     <!-- External Libraries -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -92,6 +92,39 @@
             font-weight: 500;
         }
 
+        /* Optimization Mode Toggle */
+        .optimization-mode {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem;
+            border-radius: 20px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: rgba(255,255,255,0.2);
+            border-radius: 15px;
+            padding: 2px;
+        }
+
+        .mode-btn {
+            padding: 0.25rem 0.75rem;
+            border: none;
+            background: transparent;
+            color: white;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .mode-btn.active {
+            background: rgba(255,255,255,0.3);
+            font-weight: 600;
+        }
+
         /* Main Layout */
         .main-container {
             display: flex;
@@ -178,7 +211,7 @@
 
         .card-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 0.5rem;
         }
@@ -189,6 +222,37 @@
             font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        /* Auto Mode Indicator */
+        .auto-mode-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .auto-mode-indicator.manual {
+            background: linear-gradient(135deg, #6c757d, #495057);
+        }
+
+        .auto-mode-indicator .pulse {
+            width: 8px;
+            height: 8px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
         /* Lists */
@@ -244,7 +308,6 @@
         .status-returning { background: #f8d7da; color: #721c24; }
         .status-maintenance { background: #e2e3e5; color: #383d41; }
         .status-offline { background: #f8d7da; color: #721c24; }
-
         .status-active { background: #d4edda; color: #155724; }
         .status-full { background: #f8d7da; color: #721c24; }
 
@@ -346,6 +409,11 @@
             font-size: 0.8rem;
         }
 
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         /* Events */
         .event-item {
             padding: 0.5rem;
@@ -392,6 +460,62 @@
             box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.25);
         }
 
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-group .form-control {
+            flex: 1;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -414,7 +538,7 @@
             background: white;
             padding: 2rem;
             border-radius: 8px;
-            max-width: 500px;
+            max-width: 600px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
@@ -463,25 +587,68 @@
             border-left-color: #ffc107;
         }
 
+        .notification.info {
+            border-left-color: #17a2b8;
+        }
+
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 300px;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-            }
-            
-            .simulation-controls {
-                flex-wrap: wrap;
-            }
+        /* Auto-refresh indicator */
+        .auto-refresh-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 1000;
+        }
+
+        .refresh-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid #ffffff40;
+            border-top: 2px solid #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Route visualization */
+        .route-info {
+            background: rgba(255,255,255,0.9);
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .route-geometry-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.25rem;
+        }
+
+        .route-geometry-indicator.osrm {
+            background: #28a745;
+        }
+
+        .route-geometry-indicator.direct {
+            background: #ffc107;
         }
 
         /* Loading */
@@ -501,11 +668,6 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-right: 0.5rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
 
         /* Map overlays */
@@ -547,14 +709,38 @@
         .truck-icon { background: #007bff; }
         .bin-icon { background: #28a745; }
         .depot-icon { background: #ffc107; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 300px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .simulation-controls {
+                flex-wrap: wrap;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- Header -->
     <div class="header">
-        <h1><i class="fas fa-truck"></i> Cleanify</h1>
+        <h1><i class="fas fa-truck"></i> Cleanify Pro</h1>
         
         <div class="header-center">
+            <div class="optimization-mode">
+                <span>Mode:</span>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="autoModeBtn">Auto</button>
+                    <button class="mode-btn" id="manualModeBtn">Manual</button>
+                </div>
+            </div>
+            
             <div class="simulation-controls">
                 <button class="control-btn" id="playPauseBtn" title="Play/Pause">
                     <i class="fas fa-play"></i>
@@ -596,10 +782,11 @@
                 <div class="sidebar-content">
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-title">Fleet Overview</div>
-                            <button class="btn btn-sm btn-primary" id="optimizeBtn">
-                                <i class="fas fa-route"></i> Optimize
-                            </button>
+                            <div class="card-title">Fleet Control</div>
+                            <div class="auto-mode-indicator" id="optimizationModeIndicator">
+                                <div class="pulse"></div>
+                                <span>Auto Mode</span>
+                            </div>
                         </div>
                         <div class="stats-grid">
                             <div class="stat-card">
@@ -610,6 +797,11 @@
                                 <div class="stat-value" id="activeTrucks">0</div>
                                 <div class="stat-label">Active</div>
                             </div>
+                        </div>
+                        <div style="margin-top: 1rem;">
+                            <button class="btn btn-primary" id="optimizeBtn" style="width: 100%;">
+                                <i class="fas fa-route"></i> <span id="optimizeBtnText">Optimize Routes</span>
+                            </button>
                         </div>
                     </div>
                     
@@ -630,7 +822,7 @@
                 <div class="sidebar-content">
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-title">Bins Overview</div>
+                            <div class="card-title">Bin Management</div>
                             <button class="btn btn-sm btn-warning" id="collectUrgentBtn">
                                 <i class="fas fa-exclamation-triangle"></i> Urgent
                             </button>
@@ -664,7 +856,7 @@
                 <div class="sidebar-content">
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-title">Recent Events</div>
+                            <div class="card-title">System Events</div>
                             <button class="btn btn-sm btn-danger" id="clearEventsBtn">
                                 <i class="fas fa-trash"></i> Clear
                             </button>
@@ -688,6 +880,7 @@
             <div class="map-overlay">
                 <div><strong>Traffic:</strong> <span id="trafficStatus">Normal</span></div>
                 <div><strong>Mode:</strong> <span id="thresholdMode">Static</span></div>
+                <div><strong>Routes:</strong> <span id="routeCount">0</span> active</div>
             </div>
             
             <!-- Legend -->
@@ -705,6 +898,14 @@
                     <div class="legend-icon depot-icon"></div>
                     <span>Depots</span>
                 </div>
+                <div class="legend-item">
+                    <div class="route-geometry-indicator osrm"></div>
+                    <span>OSRM Routes</span>
+                </div>
+                <div class="legend-item">
+                    <div class="route-geometry-indicator direct"></div>
+                    <span>Direct Routes</span>
+                </div>
             </div>
         </div>
 
@@ -713,6 +914,7 @@
             <div class="tabs">
                 <button class="tab active" data-tab="stats">Stats</button>
                 <button class="tab" data-tab="routes">Routes</button>
+                <button class="tab" data-tab="auto-settings">Auto</button>
                 <button class="tab" data-tab="settings">Settings</button>
             </div>
             
@@ -765,6 +967,61 @@
                 </div>
             </div>
             
+            <!-- Auto Settings Tab -->
+            <div class="tab-content" id="auto-settings-tab">
+                <div class="sidebar-content">
+                    <div class="card">
+                        <div class="card-title">Auto-Optimization Settings</div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Optimization Interval (minutes)</label>
+                            <input type="number" class="form-control" id="autoOptimizationInterval" 
+                                   min="1" max="60" value="5">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Urgent Bin Threshold (%)</label>
+                            <input type="range" class="form-control" id="urgentThreshold" 
+                                   min="50" max="100" step="5" value="90">
+                            <small id="urgentThresholdValue">90%</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Auto Bin Filling</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="autoBinFilling" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Auto Maintenance Completion</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="autoMaintenanceCompletion" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Maintenance Duration (minutes)</label>
+                            <input type="number" class="form-control" id="maintenanceDuration" 
+                                   min="1" max="60" value="10">
+                        </div>
+                        
+                        <button class="btn btn-primary" id="saveAutoSettingsBtn" style="width: 100%;">
+                            <i class="fas fa-save"></i> Save Auto Settings
+                        </button>
+                        
+                        <div id="autoOptimizationStatus" style="margin-top: 1rem;">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading auto status...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Settings Tab -->
             <div class="tab-content" id="settings-tab">
                 <div class="sidebar-content">
@@ -781,7 +1038,8 @@
                         
                         <div class="form-group" id="manualTrafficGroup" style="display: none;">
                             <label class="form-label">Traffic Multiplier</label>
-                            <input type="range" class="form-control" id="trafficMultiplier" min="1" max="2" step="0.1" value="1">
+                            <input type="range" class="form-control" id="trafficMultiplier" 
+                                   min="1" max="2" step="0.1" value="1">
                             <small id="trafficValue">1.0x</small>
                         </div>
                         
@@ -794,12 +1052,31 @@
                         </div>
                         
                         <div class="form-group">
-                            <label class="form-label">Collections per Day</label>
-                            <input type="number" class="form-control" id="collectionsPerDay" min="1" max="10" value="2">
+                            <label class="form-label">Use OSRM Routes</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="useOsrmRoutes" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
                         </div>
                         
-                        <button class="btn btn-primary" id="saveSettingsBtn">
+                        <div class="form-group">
+                            <label class="form-label">Collections per Day</label>
+                            <input type="number" class="form-control" id="collectionsPerDay" 
+                                   min="1" max="10" value="2">
+                        </div>
+                        
+                        <button class="btn btn-primary" id="saveSettingsBtn" style="width: 100%;">
                             <i class="fas fa-save"></i> Save Settings
+                        </button>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-title">Advanced</div>
+                        <button class="btn btn-warning" id="advancedSettingsBtn" style="width: 100%;">
+                            <i class="fas fa-cogs"></i> Advanced Settings
+                        </button>
+                        <button class="btn btn-danger" id="resetAllBtn" style="width: 100%; margin-top: 0.5rem;">
+                            <i class="fas fa-undo"></i> Reset All
                         </button>
                     </div>
                 </div>
@@ -807,40 +1084,28 @@
         </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div class="modal" id="settingsModal">
+    <!-- Advanced Settings Modal -->
+    <div class="modal" id="advancedModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title">Advanced Settings</h3>
-                <button class="close" id="closeModal">&times;</button>
+                <button class="close" id="closeAdvancedModal">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="tabs">
-                    <button class="tab active" data-tab="sim-settings">Simulation</button>
-                    <button class="tab" data-tab="opt-settings">Optimization</button>
-                    <button class="tab" data-tab="thresh-settings">Thresholds</button>
+                    <button class="tab active" data-tab="opt-advanced">Optimization</button>
+                    <button class="tab" data-tab="sim-advanced">Simulation</button>
+                    <button class="tab" data-tab="thresh-advanced">Thresholds</button>
                 </div>
                 
-                <div class="tab-content active" id="sim-settings">
-                    <div class="form-group">
-                        <label class="form-label">Auto Optimization</label>
-                        <input type="checkbox" id="autoOptimization" checked>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Auto Bin Filling</label>
-                        <input type="checkbox" id="autoBinFilling" checked>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Truck Breakdown Probability</label>
-                        <input type="range" class="form-control" id="breakdownProbability" min="0" max="0.01" step="0.001" value="0.001">
-                        <small id="breakdownValue">0.001</small>
-                    </div>
-                </div>
-                
-                <div class="tab-content" id="opt-settings">
+                <div class="tab-content active" id="opt-advanced">
                     <div class="form-group">
                         <label class="form-label">VRP Time Limit (seconds)</label>
                         <input type="number" class="form-control" id="vrpTimeLimit" value="30">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Knapsack Time Limit (seconds)</label>
+                        <input type="number" class="form-control" id="knapsackTimeLimit" value="5">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Optimization Algorithm</label>
@@ -850,47 +1115,89 @@
                             <option value="guided_local_search">Guided Local Search</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Route Following Precision (km)</label>
+                        <input type="number" class="form-control" id="routeFollowingPrecision" 
+                               min="0.001" max="1" step="0.001" value="0.01">
+                    </div>
                 </div>
                 
-                <div class="tab-content" id="thresh-settings">
+                <div class="tab-content" id="sim-advanced">
+                    <div class="form-group">
+                        <label class="form-label">Truck Breakdown Probability</label>
+                        <input type="range" class="form-control" id="breakdownProbability" 
+                               min="0" max="0.01" step="0.0001" value="0.001">
+                        <small id="breakdownValue">0.001</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Bin Overflow Enabled</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="binOverflowEnabled" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Depot Processing Enabled</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="depotProcessingEnabled" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Emit Frequency (ticks)</label>
+                        <input type="number" class="form-control" id="emitFrequency" 
+                               min="1" max="10" value="1">
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="thresh-advanced">
                     <div class="form-group">
                         <label class="form-label">General Waste Threshold (%)</label>
-                        <input type="number" class="form-control" id="generalThreshold" min="0" max="100" value="80">
+                        <input type="number" class="form-control" id="generalThreshold" 
+                               min="0" max="100" value="80">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Recyclable Threshold (%)</label>
-                        <input type="number" class="form-control" id="recyclableThreshold" min="0" max="100" value="85">
+                        <input type="number" class="form-control" id="recyclableThreshold" 
+                               min="0" max="100" value="85">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Hazardous Threshold (%)</label>
-                        <input type="number" class="form-control" id="hazardousThreshold" min="0" max="100" value="70">
+                        <input type="number" class="form-control" id="hazardousThreshold" 
+                               min="0" max="100" value="70">
                     </div>
                 </div>
                 
                 <div style="margin-top: 1rem;">
-                    <button class="btn btn-primary" id="saveAdvancedSettings">Save Advanced Settings</button>
-                    <button class="btn btn-danger" id="resetSettings">Reset to Defaults</button>
+                    <button class="btn btn-primary" id="saveAdvancedSettingsBtn">Save Advanced</button>
+                    <button class="btn btn-danger" id="resetAdvancedSettingsBtn">Reset to Defaults</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Auto-refresh indicator -->
+    <div class="auto-refresh-indicator" id="autoRefreshIndicator">
+        <div class="refresh-spinner"></div>
+        <span>Auto-updating...</span>
+    </div>
+
     <!-- External Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 
     <script>
-        // Configuration
+        // Enhanced Configuration
         const CONFIG = {
             API_BASE: 'http://localhost:8000/api',
             SOCKET_URL: 'http://localhost:8000',
-            DEFAULT_CENTER: [31.5204, 74.3587], // Lahore coordinates
+            DEFAULT_CENTER: [31.5204, 74.3587],
             DEFAULT_ZOOM: 13,
-            UPDATE_INTERVAL: 5000 // 5 seconds
+            UPDATE_INTERVAL: 3000, // 3 seconds for better responsiveness
+            AUTO_OPTIMIZATION_CHECK_INTERVAL: 10000 // 10 seconds
         };
 
-        // Global state
+        // Enhanced Global state
         let map;
         let socket;
         let markers = {
@@ -902,6 +1209,9 @@
         let isPlaying = false;
         let currentSpeed = 1;
         let simulationData = {};
+        let optimizationMode = 'auto';
+        let autoRefreshTimer;
+        let autoOptimizationTimer;
 
         // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
@@ -910,7 +1220,8 @@
             initializeEventListeners();
             initializeTabs();
             loadInitialData();
-            startDataRefresh();
+            startAutoRefresh();
+            startAutoOptimizationMonitoring();
         });
 
         // Map initialization
@@ -922,7 +1233,7 @@
             }).addTo(map);
         }
 
-        // Socket.IO initialization
+        // Enhanced Socket.IO initialization
         function initializeSocket() {
             socket = io(CONFIG.SOCKET_URL);
             
@@ -942,41 +1253,49 @@
             
             socket.on('simulation_event', function(event) {
                 addEvent(event);
-            });
-            
-            socket.on('server_message', function(data) {
-                console.log('Server message:', data.msg);
+                handleSpecialEvents(event);
             });
         }
 
-        // Event listeners
+        // Enhanced event listeners
         function initializeEventListeners() {
+            // Mode toggle
+            document.getElementById('autoModeBtn').addEventListener('click', () => setOptimizationMode('auto'));
+            document.getElementById('manualModeBtn').addEventListener('click', () => setOptimizationMode('manual'));
+            
             // Simulation controls
             document.getElementById('playPauseBtn').addEventListener('click', togglePlayPause);
             document.getElementById('stopBtn').addEventListener('click', stopSimulation);
             document.getElementById('speedSlider').addEventListener('input', updateSpeed);
             
-            // Buttons
+            // Optimization controls
             document.getElementById('optimizeBtn').addEventListener('click', triggerOptimization);
             document.getElementById('collectUrgentBtn').addEventListener('click', collectUrgentBins);
-            document.getElementById('clearEventsBtn').addEventListener('click', clearEvents);
             document.getElementById('clearRoutesBtn').addEventListener('click', clearAllRoutes);
-            document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
-            document.getElementById('closeModal').addEventListener('click', closeSettingsModal);
             
-            // Settings
+            // Settings controls
             document.getElementById('trafficMode').addEventListener('change', updateTrafficMode);
             document.getElementById('trafficMultiplier').addEventListener('input', updateTrafficMultiplier);
             document.getElementById('thresholdModeSelect').addEventListener('change', updateThresholdMode);
             document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
-            document.getElementById('saveAdvancedSettings').addEventListener('click', saveAdvancedSettings);
-            document.getElementById('resetSettings').addEventListener('click', resetSettings);
             
-            // Modal click outside to close
-            document.getElementById('settingsModal').addEventListener('click', function(e) {
-                if (e.target === this) {
-                    closeSettingsModal();
-                }
+            // Auto settings
+            document.getElementById('urgentThreshold').addEventListener('input', updateUrgentThresholdDisplay);
+            document.getElementById('saveAutoSettingsBtn').addEventListener('click', saveAutoSettings);
+            
+            // Advanced settings
+            document.getElementById('advancedSettingsBtn').addEventListener('click', openAdvancedModal);
+            document.getElementById('closeAdvancedModal').addEventListener('click', closeAdvancedModal);
+            document.getElementById('saveAdvancedSettingsBtn').addEventListener('click', saveAdvancedSettings);
+            document.getElementById('resetAdvancedSettingsBtn').addEventListener('click', resetAdvancedSettings);
+            document.getElementById('resetAllBtn').addEventListener('click', resetAllSettings);
+            
+            // Events
+            document.getElementById('clearEventsBtn').addEventListener('click', clearEvents);
+            
+            // Update displays
+            document.getElementById('breakdownProbability').addEventListener('input', function() {
+                document.getElementById('breakdownValue').textContent = this.value;
             });
         }
 
@@ -985,13 +1304,11 @@
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.addEventListener('click', function() {
                     const tabName = this.dataset.tab;
-                    const container = this.closest('.sidebar');
+                    const container = this.closest('.sidebar') || this.closest('.modal-body');
                     
-                    // Update tab buttons
                     container.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                     this.classList.add('active');
                     
-                    // Update tab content
                     container.querySelectorAll('.tab-content').forEach(content => {
                         content.classList.remove('active');
                     });
@@ -1000,7 +1317,7 @@
             });
         }
 
-        // API functions
+        // Enhanced API functions with better error handling
         async function apiCall(endpoint, method = 'GET', data = null) {
             try {
                 const options = {
@@ -1029,7 +1346,104 @@
             }
         }
 
-        // Simulation controls
+        // Optimization mode management
+        async function setOptimizationMode(mode) {
+            try {
+                await apiCall('/optimization/mode', 'POST', { mode });
+                optimizationMode = mode;
+                updateOptimizationModeUI(mode);
+                showNotification(`Optimization mode set to ${mode}`, 'success');
+                
+                // Load auto settings if switching to auto mode
+                if (mode === 'auto') {
+                    await loadAutoOptimizationStatus();
+                }
+            } catch (error) {
+                console.error('Failed to set optimization mode:', error);
+            }
+        }
+
+        function updateOptimizationModeUI(mode) {
+            // Update mode buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(mode + 'ModeBtn').classList.add('active');
+            
+            // Update indicator
+            const indicator = document.getElementById('optimizationModeIndicator');
+            if (mode === 'auto') {
+                indicator.classList.remove('manual');
+                indicator.innerHTML = '<div class="pulse"></div><span>Auto Mode</span>';
+                document.getElementById('optimizeBtnText').textContent = 'Force Optimize';
+            } else {
+                indicator.classList.add('manual');
+                indicator.innerHTML = '<span>Manual Mode</span>';
+                document.getElementById('optimizeBtnText').textContent = 'Optimize Routes';
+            }
+            
+            // Enable/disable auto settings tab
+            const autoTab = document.querySelector('[data-tab="auto-settings"]');
+            if (mode === 'auto') {
+                autoTab.style.display = 'block';
+            } else {
+                autoTab.style.display = 'none';
+            }
+        }
+
+        // Auto-optimization monitoring
+        function startAutoOptimizationMonitoring() {
+            autoOptimizationTimer = setInterval(async () => {
+                if (optimizationMode === 'auto') {
+                    try {
+                        await loadAutoOptimizationStatus();
+                    } catch (error) {
+                        console.error('Failed to load auto optimization status:', error);
+                    }
+                }
+            }, CONFIG.AUTO_OPTIMIZATION_CHECK_INTERVAL);
+        }
+
+        async function loadAutoOptimizationStatus() {
+            try {
+                const result = await apiCall('/optimization/auto_config');
+                updateAutoOptimizationStatusUI(result.auto_optimization);
+            } catch (error) {
+                console.error('Failed to load auto optimization status:', error);
+            }
+        }
+
+        function updateAutoOptimizationStatusUI(config) {
+            const statusDiv = document.getElementById('autoOptimizationStatus');
+            
+            if (config.enabled) {
+                const lastOpt = new Date(config.last_optimization);
+                const nextOpt = config.next_scheduled ? new Date(config.next_scheduled) : null;
+                const now = new Date();
+                
+                let nextOptText = 'Unknown';
+                if (nextOpt) {
+                    const timeDiff = nextOpt - now;
+                    if (timeDiff > 0) {
+                        const minutes = Math.floor(timeDiff / 1000 / 60);
+                        nextOptText = `${minutes} minutes`;
+                    } else {
+                        nextOptText = 'Overdue';
+                    }
+                }
+                
+                statusDiv.innerHTML = `
+                    <div style="font-size: 0.8rem; color: #6c757d;">
+                        <div><strong>Last Run:</strong> ${lastOpt.toLocaleTimeString()}</div>
+                        <div><strong>Next Run:</strong> ${nextOptText}</div>
+                        <div><strong>Interval:</strong> ${config.interval_minutes} minutes</div>
+                        <div><strong>Urgent Threshold:</strong> ${config.urgent_threshold}%</div>
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = '<div style="color: #6c757d;">Auto-optimization disabled</div>';
+            }
+        }
+
+        // Enhanced simulation controls
         async function togglePlayPause() {
             try {
                 if (isPlaying) {
@@ -1071,19 +1485,73 @@
             }
         }
 
-        // Data loading functions
+        // Enhanced optimization controls
+        async function triggerOptimization() {
+            try {
+                const btn = document.getElementById('optimizeBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Optimizing...';
+                
+                showNotification('Triggering optimization...', 'info');
+                
+                const result = await apiCall('/optimization/optimize', 'POST', {});
+                
+                showNotification(result.message || 'Optimization completed successfully', 'success');
+                await loadRoutes(); // Refresh routes
+            } catch (error) {
+                console.error('Failed to trigger optimization:', error);
+            } finally {
+                const btn = document.getElementById('optimizeBtn');
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-route"></i> ${document.getElementById('optimizeBtnText').textContent}`;
+            }
+        }
+
+        async function collectUrgentBins() {
+            try {
+                showNotification('Collecting urgent bins...', 'info');
+                const result = await apiCall('/bins/collect/urgent', 'POST');
+                showNotification(result.message || 'Urgent collection completed', 'success');
+            } catch (error) {
+                console.error('Failed to collect urgent bins:', error);
+            }
+        }
+
+        async function clearAllRoutes() {
+            try {
+                await apiCall('/optimization/clear_all_routes', 'POST');
+                showNotification('All routes cleared', 'success');
+                await loadRoutes();
+            } catch (error) {
+                console.error('Failed to clear routes:', error);
+            }
+        }
+
+        // Enhanced data loading
         async function loadInitialData() {
             try {
                 await Promise.all([
+                    loadOptimizationMode(),
                     loadTrucks(),
                     loadBins(),
                     loadDepots(),
                     loadRoutes(),
                     loadSettings(),
-                    loadSimulationStatus()
+                    loadSimulationStatus(),
+                    loadAutoOptimizationStatus()
                 ]);
             } catch (error) {
                 console.error('Failed to load initial data:', error);
+            }
+        }
+
+        async function loadOptimizationMode() {
+            try {
+                const result = await apiCall('/optimization/mode');
+                optimizationMode = result.mode;
+                updateOptimizationModeUI(result.mode);
+            } catch (error) {
+                console.error('Failed to load optimization mode:', error);
             }
         }
 
@@ -1109,8 +1577,7 @@
 
         async function loadDepots() {
             try {
-                // Note: Add depot endpoint when available
-                // For now, create a default depot
+                // Create default depot for now
                 const depots = [{
                     id: 'main_depot',
                     name: 'Main Depot',
@@ -1127,6 +1594,9 @@
                 const result = await apiCall('/optimization/routes');
                 updateRoutesList(result.routes);
                 updateRoutesOnMap(result.routes);
+                
+                // Update route count in overlay
+                document.getElementById('routeCount').textContent = result.active_routes || 0;
             } catch (error) {
                 console.error('Failed to load routes:', error);
             }
@@ -1150,7 +1620,7 @@
             }
         }
 
-        // Update functions
+        // Enhanced update functions
         function updateSimulationData(data) {
             simulationData = data;
             
@@ -1161,7 +1631,13 @@
                 timeEl.textContent = date.toLocaleString();
             }
             
-            // Update trucks
+            // Update optimization mode from data
+            if (data.optimization_mode && data.optimization_mode !== optimizationMode) {
+                optimizationMode = data.optimization_mode;
+                updateOptimizationModeUI(data.optimization_mode);
+            }
+            
+            // Update trucks with enhanced route geometry
             if (data.trucks) {
                 updateTrucksList(data.trucks);
                 updateTrucksOnMap(data.trucks);
@@ -1171,6 +1647,11 @@
             if (data.bins) {
                 updateBinsList(data.bins);
                 updateBinsOnMap(data.bins);
+            }
+            
+            // Update routes with geometry from socket data
+            if (data.truck_routes_geometry) {
+                updateRoutesFromGeometry(data.truck_routes_geometry);
             }
             
             // Update statistics
@@ -1199,6 +1680,7 @@
                         <div class="item-details">
                             Load: ${truck.load_percentage.toFixed(1)}% | 
                             Fuel: ${truck.fuel_level.toFixed(1)}%
+                            ${truck.route && truck.route.length > 0 ? ` | Route: ${truck.route.length} bins` : ''}
                         </div>
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${truck.load_percentage}%"></div>
@@ -1228,6 +1710,7 @@
                         <div class="item-details">
                             Type: ${bin.type} | 
                             Fill: ${bin.fill_level.toFixed(1)}%
+                            ${bin.needs_collection ? ' | <strong>URGENT</strong>' : ''}
                         </div>
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${bin.fill_level}%"></div>
@@ -1250,20 +1733,27 @@
                 return;
             }
             
-            container.innerHTML = Object.values(routes).map(route => `
-                <div class="list-item">
-                    <div class="item-info">
-                        <div class="item-name">${route.truck_id}</div>
-                        <div class="item-details">
-                            Bins: ${route.bin_ids ? route.bin_ids.length : 0} | 
-                            Progress: ${route.route_progress ? route.route_progress.toFixed(1) : 0}%
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${route.route_progress || 0}%"></div>
+            container.innerHTML = Object.values(routes).map(route => {
+                const hasGeometry = route.has_osrm_geometry || false;
+                return `
+                    <div class="list-item">
+                        <div class="item-info">
+                            <div class="item-name">
+                                ${route.truck_id}
+                                <span class="route-geometry-indicator ${hasGeometry ? 'osrm' : 'direct'}"></span>
+                            </div>
+                            <div class="item-details">
+                                Bins: ${route.route ? route.route.length : 0} | 
+                                Progress: ${route.route_progress ? route.route_progress.toFixed(1) : 0}%
+                                ${hasGeometry ? ' | OSRM Route' : ' | Direct Route'}
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${route.route_progress || 0}%"></div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function updateStatistics(stats) {
@@ -1281,6 +1771,9 @@
                 </div>
                 <div style="margin-bottom: 0.5rem;">
                     <strong>Simulation Uptime:</strong> ${formatDuration(stats.simulation_uptime || 0)}
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <strong>Optimization Mode:</strong> ${optimizationMode.toUpperCase()}
                 </div>
             `;
         }
@@ -1315,6 +1808,12 @@
             
             document.getElementById('speedSlider').value = currentSpeed;
             document.getElementById('speedValue').textContent = `${currentSpeed}x`;
+            
+            // Update optimization mode if available
+            if (status.optimization_mode) {
+                optimizationMode = status.optimization_mode;
+                updateOptimizationModeUI(status.optimization_mode);
+            }
         }
 
         function updateSettingsUI(settings) {
@@ -1329,28 +1828,29 @@
                 document.getElementById('thresholdMode').textContent = settings.threshold.mode;
                 document.getElementById('thresholdModeSelect').value = settings.threshold.mode;
             }
+            
+            if (settings.simulation) {
+                document.getElementById('autoBinFilling').checked = settings.simulation.config.auto_bin_filling;
+                document.getElementById('autoMaintenanceCompletion').checked = settings.simulation.config.auto_maintenance_completion;
+                document.getElementById('maintenanceDuration').value = settings.simulation.config.maintenance_duration_minutes || 10;
+            }
         }
 
-        // Map update functions
-        // Map update functions
+        // Enhanced map functions
         function updateTrucksOnMap(trucks) {
             trucks.forEach(truck => {
                 const [lon, lat] = truck.location;
                 const color = getTruckColor(truck.status);
                 
-                // Store old location for animation
                 const existingMarker = markers.trucks.get(truck.id);
                 const oldLocation = existingMarker ? [existingMarker.getLatLng().lng, existingMarker.getLatLng().lat] : null;
                 
                 if (existingMarker) {
-                    // Update existing marker with animation
                     const newLocation = [lon, lat];
                     if (oldLocation && (oldLocation[0] !== lon || oldLocation[1] !== lat)) {
-                        // Animate smooth movement
                         animateTruckMovement(truck, oldLocation, newLocation);
                     }
                     
-                    // Update marker style and popup
                     existingMarker.setStyle({
                         radius: 8,
                         fillColor: color,
@@ -1360,7 +1860,6 @@
                         fillOpacity: 0.8
                     });
                 } else {
-                    // Create new marker
                     const marker = L.circleMarker([lat, lon], {
                         radius: 8,
                         fillColor: color,
@@ -1373,15 +1872,19 @@
                     markers.trucks.set(truck.id, marker);
                 }
                 
-                // Update popup content
+                // Enhanced popup with route info
                 const marker = markers.trucks.get(truck.id);
+                const routeInfo = truck.route && truck.route.length > 0 ? 
+                    `<br>Route: ${truck.route.length} bins<br>Progress: ${truck.current_route_index}/${truck.route.length}` : 
+                    '<br>No route assigned';
+                
                 marker.bindPopup(`
                     <strong>${truck.id}</strong><br>
                     Status: ${truck.status}<br>
                     Load: ${truck.load_percentage.toFixed(1)}%<br>
                     Fuel: ${truck.fuel_level.toFixed(1)}%<br>
-                    Speed: ${truck.speed} km/h<br>
-                    Next: ${truck.next_destination || 'None'}
+                    Speed: ${truck.speed} km/h
+                    ${routeInfo}
                 `);
             });
             
@@ -1418,6 +1921,7 @@
                     Fill Level: ${bin.fill_level.toFixed(1)}%<br>
                     Status: ${bin.status}<br>
                     Needs Collection: ${bin.needs_collection ? 'Yes' : 'No'}
+                    ${bin.needs_collection ? '<br><strong style="color: #dc3545;">URGENT!</strong>' : ''}
                 `);
                 
                 markers.bins.set(bin.id, marker);
@@ -1458,10 +1962,12 @@
             // Add new routes
             Object.values(routesData).forEach(routeData => {
                 let routePoints = [];
+                let isOsrmRoute = false;
                 
-                // FIXED: Use route_geometry if available (actual road path from OSRM)
+                // Use route_geometry if available (actual road path from OSRM)
                 if (routeData.route_geometry && routeData.route_geometry.length > 0) {
                     routePoints = routeData.route_geometry; // Already in [lat, lon] format
+                    isOsrmRoute = true;
                     console.log(`🛣️ Using OSRM route geometry for ${routeData.truck_id}: ${routePoints.length} points`);
                 }
                 // Fallback: Use bin locations (straight lines)
@@ -1476,16 +1982,16 @@
                 if (routePoints.length > 0) {
                     const route = L.polyline(routePoints, {
                         color: getTruckColor(routeData.truck_status || 'en_route'),
-                        weight: 4,           // Slightly thicker for visibility
-                        opacity: 0.8,       // More opaque
-                        dashArray: routeData.route_geometry ? null : '10, 5'  // Dashed if straight line
+                        weight: isOsrmRoute ? 4 : 3,
+                        opacity: isOsrmRoute ? 0.8 : 0.6,
+                        dashArray: isOsrmRoute ? null : '10, 5'
                     }).addTo(map);
                     
-                    // Add tooltip showing route info
                     route.bindTooltip(`
                         <strong>Route: ${routeData.truck_id}</strong><br>
+                        Type: ${isOsrmRoute ? 'OSRM Road Route' : 'Direct Line'}<br>
                         Distance: ${(routeData.total_distance || 0).toFixed(1)} km<br>
-                        Type: ${routeData.route_geometry ? 'Road Route' : 'Direct Line'}
+                        Progress: ${(routeData.route_progress || 0).toFixed(1)}%
                     `);
                     
                     routes.set(routeData.truck_id, route);
@@ -1493,52 +1999,34 @@
             });
         }
 
-        // Action functions
-        async function triggerOptimization() {
-            try {
-                showNotification('Triggering optimization...', 'info');
-                
-                // FIX: Send empty JSON object instead of no body
-                const result = await apiCall('/optimization/optimize', 'POST', {});
-                
-                showNotification('Optimization completed successfully', 'success');
-                await loadRoutes(); // Refresh routes
-            } catch (error) {
-                console.error('Failed to trigger optimization:', error);
-            }
+        function updateRoutesFromGeometry(geometryData) {
+            // Update routes based on geometry data from socket
+            Object.entries(geometryData).forEach(([truckId, geometry]) => {
+                if (geometry && geometry.length > 0) {
+                    // Remove existing route for this truck
+                    if (routes.has(truckId)) {
+                        map.removeLayer(routes.get(truckId));
+                    }
+                    
+                    // Add new route with geometry
+                    const route = L.polyline(geometry, {
+                        color: '#007bff',
+                        weight: 4,
+                        opacity: 0.8
+                    }).addTo(map);
+                    
+                    route.bindTooltip(`
+                        <strong>Route: ${truckId}</strong><br>
+                        Type: OSRM Road Route<br>
+                        Points: ${geometry.length}
+                    `);
+                    
+                    routes.set(truckId, route);
+                }
+            });
         }
 
-        async function collectUrgentBins() {
-            try {
-                showNotification('Collecting urgent bins...', 'info');
-                const result = await apiCall('/bins/collect/urgent', 'POST');
-                showNotification('Urgent collection completed', 'success');
-            } catch (error) {
-                console.error('Failed to collect urgent bins:', error);
-            }
-        }
-
-        async function clearEvents() {
-            try {
-                await apiCall('/simulation/events', 'DELETE');
-                document.getElementById('eventsList').innerHTML = '<div class="loading">No events</div>';
-                showNotification('Events cleared', 'success');
-            } catch (error) {
-                console.error('Failed to clear events:', error);
-            }
-        }
-
-        async function clearAllRoutes() {
-            try {
-                await apiCall('/optimization/clear_all_routes', 'POST');
-                showNotification('All routes cleared', 'success');
-                await loadRoutes(); // Refresh routes
-            } catch (error) {
-                console.error('Failed to clear routes:', error);
-            }
-        }
-
-        // Settings functions
+        // Enhanced settings functions
         function updateTrafficMode() {
             const mode = document.getElementById('trafficMode').value;
             toggleManualTrafficControls(mode === 'manual');
@@ -1552,6 +2040,11 @@
         function updateTrafficMultiplier() {
             const value = document.getElementById('trafficMultiplier').value;
             document.getElementById('trafficValue').textContent = `${value}x`;
+        }
+
+        function updateUrgentThresholdDisplay() {
+            const value = document.getElementById('urgentThreshold').value;
+            document.getElementById('urgentThresholdValue').textContent = `${value}%`;
         }
 
         async function updateThresholdMode() {
@@ -1579,65 +2072,149 @@
                 const collectionsPerDay = parseInt(document.getElementById('collectionsPerDay').value);
                 await apiCall('/settings/collections_per_day', 'POST', { collections_per_day: collectionsPerDay });
                 
+                // Save OSRM routes setting
+                const useOsrmRoutes = document.getElementById('useOsrmRoutes').checked;
+                await apiCall('/optimization/config', 'POST', { use_osrm_routes: useOsrmRoutes });
+                
                 showNotification('Settings saved successfully', 'success');
             } catch (error) {
                 console.error('Failed to save settings:', error);
             }
         }
 
+        async function saveAutoSettings() {
+            try {
+                const interval = parseInt(document.getElementById('autoOptimizationInterval').value);
+                const threshold = parseFloat(document.getElementById('urgentThreshold').value);
+                const autoBinFilling = document.getElementById('autoBinFilling').checked;
+                const autoMaintenanceCompletion = document.getElementById('autoMaintenanceCompletion').checked;
+                const maintenanceDuration = parseInt(document.getElementById('maintenanceDuration').value);
+                
+                // Update auto-optimization config
+                await apiCall('/optimization/auto_config', 'POST', {
+                    interval_minutes: interval,
+                    urgent_threshold: threshold
+                });
+                
+                // Update simulation config
+                await apiCall('/settings/simulation', 'POST', {
+                    config: {
+                        auto_bin_filling: autoBinFilling,
+                        auto_maintenance_completion: autoMaintenanceCompletion,
+                        maintenance_duration_minutes: maintenanceDuration
+                    }
+                });
+                
+                showNotification('Auto settings saved successfully', 'success');
+                await loadAutoOptimizationStatus();
+            } catch (error) {
+                console.error('Failed to save auto settings:', error);
+            }
+        }
+
         async function saveAdvancedSettings() {
             try {
-                const simSettings = {
-                    auto_optimization: document.getElementById('autoOptimization').checked,
-                    auto_bin_filling: document.getElementById('autoBinFilling').checked,
-                    truck_breakdown_probability: parseFloat(document.getElementById('breakdownProbability').value)
-                };
+                const vrpTimeLimit = parseInt(document.getElementById('vrpTimeLimit').value);
+                const knapsackTimeLimit = parseInt(document.getElementById('knapsackTimeLimit').value);
+                const optimizationAlgorithm = document.getElementById('optimizationAlgorithm').value;
+                const routeFollowingPrecision = parseFloat(document.getElementById('routeFollowingPrecision').value);
+                const breakdownProbability = parseFloat(document.getElementById('breakdownProbability').value);
+                const binOverflowEnabled = document.getElementById('binOverflowEnabled').checked;
+                const depotProcessingEnabled = document.getElementById('depotProcessingEnabled').checked;
+                const emitFrequency = parseInt(document.getElementById('emitFrequency').value);
                 
-                await apiCall('/settings/simulation', 'POST', { config: simSettings });
+                // Update optimization config
+                await apiCall('/optimization/config', 'POST', {
+                    vrp_time_limit_seconds: vrpTimeLimit,
+                    knapsack_time_limit_seconds: knapsackTimeLimit,
+                    optimization_algorithm: optimizationAlgorithm,
+                    route_following_precision: routeFollowingPrecision
+                });
                 
-                const optSettings = {
-                    vrp_time_limit_seconds: parseInt(document.getElementById('vrpTimeLimit').value),
-                    optimization_algorithm: document.getElementById('optimizationAlgorithm').value
-                };
+                // Update simulation config
+                await apiCall('/settings/simulation', 'POST', {
+                    config: {
+                        truck_breakdown_probability: breakdownProbability,
+                        bin_overflow_enabled: binOverflowEnabled,
+                        depot_processing_enabled: depotProcessingEnabled,
+                        emit_frequency: emitFrequency
+                    }
+                });
                 
-                await apiCall('/settings/optimization', 'POST', optSettings);
+                // Update thresholds
+                const generalThreshold = parseFloat(document.getElementById('generalThreshold').value);
+                const recyclableThreshold = parseFloat(document.getElementById('recyclableThreshold').value);
+                const hazardousThreshold = parseFloat(document.getElementById('hazardousThreshold').value);
                 
-                const thresholds = {
-                    general: parseFloat(document.getElementById('generalThreshold').value),
-                    recyclable: parseFloat(document.getElementById('recyclableThreshold').value),
-                    hazardous: parseFloat(document.getElementById('hazardousThreshold').value)
-                };
-                
-                await apiCall('/settings/threshold', 'POST', { static_thresholds: thresholds });
+                await apiCall('/settings/threshold', 'POST', {
+                    static_thresholds: {
+                        general: generalThreshold,
+                        recyclable: recyclableThreshold,
+                        hazardous: hazardousThreshold
+                    }
+                });
                 
                 showNotification('Advanced settings saved successfully', 'success');
-                closeSettingsModal();
+                closeAdvancedModal();
             } catch (error) {
                 console.error('Failed to save advanced settings:', error);
             }
         }
 
-        async function resetSettings() {
+        async function resetAdvancedSettings() {
             try {
-                await apiCall('/settings/reset', 'POST');
-                showNotification('Settings reset to defaults', 'success');
+                await apiCall('/settings/reset', 'POST', {
+                    categories: ['simulation', 'optimization', 'threshold']
+                });
+                showNotification('Advanced settings reset to defaults', 'success');
+                closeAdvancedModal();
                 await loadSettings();
-                closeSettingsModal();
             } catch (error) {
-                console.error('Failed to reset settings:', error);
+                console.error('Failed to reset advanced settings:', error);
+            }
+        }
+
+        async function resetAllSettings() {
+            if (confirm('Are you sure you want to reset ALL settings to defaults? This cannot be undone.')) {
+                try {
+                    await apiCall('/settings/reset', 'POST');
+                    showNotification('All settings reset to defaults', 'success');
+                    await loadSettings();
+                    await loadOptimizationMode();
+                } catch (error) {
+                    console.error('Failed to reset all settings:', error);
+                }
             }
         }
 
         // Modal functions
-        function openSettingsModal() {
-            document.getElementById('settingsModal').classList.add('show');
+        function openAdvancedModal() {
+            document.getElementById('advancedModal').classList.add('show');
         }
 
-        function closeSettingsModal() {
-            document.getElementById('settingsModal').classList.remove('show');
+        function closeAdvancedModal() {
+            document.getElementById('advancedModal').classList.remove('show');
         }
 
         // Event handling
+        function handleSpecialEvents(event) {
+            // Handle special events that require UI updates
+            switch (event.type) {
+                case 'auto_optimization_completed':
+                    showNotification('Auto-optimization completed', 'success');
+                    break;
+                case 'maintenance_completed':
+                    showNotification(`Truck ${event.data.truck_id} maintenance completed`, 'info');
+                    break;
+                case 'truck_breakdown':
+                    showNotification(`Truck ${event.data.truck_id} broke down`, 'warning');
+                    break;
+                case 'bin_overflow':
+                    showNotification(`Bin ${event.data.bin_id} is overflowing`, 'error');
+                    break;
+            }
+        }
+
         function addEvent(event) {
             const container = document.getElementById('eventsList');
             
@@ -1657,6 +2234,16 @@
             // Keep only latest 50 events
             while (container.children.length > 50) {
                 container.removeChild(container.lastChild);
+            }
+        }
+
+        async function clearEvents() {
+            try {
+                await apiCall('/simulation/events', 'DELETE');
+                document.getElementById('eventsList').innerHTML = '<div class="loading">No events</div>';
+                showNotification('Events cleared', 'success');
+            } catch (error) {
+                console.error('Failed to clear events:', error);
             }
         }
 
@@ -1685,9 +2272,14 @@
                 'bin_collected': `Bin ${event.data.bin_id} collected by truck ${event.data.truck_id}`,
                 'truck_breakdown': `Truck ${event.data.truck_id} broke down`,
                 'bin_overflow': `Bin ${event.data.bin_id} is overflowing`,
-                'optimization_completed': 'Route optimization completed',
+                'auto_optimization_completed': `Auto-optimization: ${event.data.bins_assigned} bins assigned to ${event.data.trucks_used} trucks`,
+                'manual_optimization_triggered': `Manual optimization: ${event.data.bins_assigned} bins assigned to ${event.data.trucks_used} trucks`,
+                'maintenance_completed': `Truck ${event.data.truck_id} completed maintenance`,
+                'truck_maintenance_started': `Truck ${event.data.truck_id} started maintenance`,
+                'optimization_mode_changed': `Optimization mode changed to ${event.data.mode}`,
                 'simulation_paused': 'Simulation paused',
-                'simulation_resumed': 'Simulation resumed'
+                'simulation_resumed': 'Simulation resumed',
+                'truck_started_route': `Truck ${event.data.truck_id} started route with ${event.data.route.length} bins`
             };
             return texts[event.type] || `${event.type}: ${JSON.stringify(event.data)}`;
         }
@@ -1721,21 +2313,6 @@
             }, 5000);
         }
 
-        // Auto-refresh data
-        function startDataRefresh() {
-            setInterval(async () => {
-                try {
-                    await Promise.all([
-                        loadTrucks(),
-                        loadBins(),
-                        loadRoutes()
-                    ]);
-                } catch (error) {
-                    console.error('Failed to refresh data:', error);
-                }
-            }, CONFIG.UPDATE_INTERVAL);
-        }
-
         // Enhanced truck movement visualization
         function animateTruckMovement(truck, oldLocation, newLocation) {
             const marker = markers.trucks.get(truck.id);
@@ -1746,16 +2323,19 @@
             if (!moved) return;
             
             // Smooth animation to new position
-            const duration = 1000; // 1 second animation
+            const duration = 2000; // 2 second animation for smoother movement
             const startTime = Date.now();
             
             function animate() {
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(elapsed / duration, 1);
                 
+                // Easing function for smoother animation
+                const easedProgress = 1 - Math.pow(1 - progress, 3);
+                
                 // Interpolate position
-                const lat = oldLocation[1] + (newLocation[1] - oldLocation[1]) * progress;
-                const lon = oldLocation[0] + (newLocation[0] - oldLocation[0]) * progress;
+                const lat = oldLocation[1] + (newLocation[1] - oldLocation[1]) * easedProgress;
+                const lon = oldLocation[0] + (newLocation[0] - oldLocation[0]) * easedProgress;
                 
                 marker.setLatLng([lat, lon]);
                 
@@ -1766,6 +2346,269 @@
             
             animate();
         }
+
+        // Auto-refresh functionality
+        function startAutoRefresh() {
+            // Clear any existing timer
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+            }
+            
+            autoRefreshTimer = setInterval(async () => {
+                try {
+                    // Update indicator
+                    const indicator = document.getElementById('autoRefreshIndicator');
+                    indicator.style.opacity = '1';
+                    
+                    await Promise.all([
+                        loadTrucks(),
+                        loadBins(),
+                        loadRoutes()
+                    ]);
+                    
+                    // Hide indicator after successful update
+                    setTimeout(() => {
+                        indicator.style.opacity = '0.7';
+                    }, 500);
+                    
+                } catch (error) {
+                    console.error('Failed to refresh data:', error);
+                    // Show error indicator
+                    const indicator = document.getElementById('autoRefreshIndicator');
+                    indicator.style.borderLeft = '4px solid #dc3545';
+                    setTimeout(() => {
+                        indicator.style.borderLeft = '';
+                    }, 2000);
+                }
+            }, CONFIG.UPDATE_INTERVAL);
+        }
+
+        // Enhanced API monitoring for auto mode
+        async function monitorAutoOptimization() {
+            if (optimizationMode !== 'auto') return;
+            
+            try {
+                const statusResult = await apiCall('/optimization/status');
+                const status = statusResult.status;
+                
+                // Check if urgent bins need immediate attention
+                if (status.bins.urgent > 0 && status.trucks.available > 0) {
+                    console.log(`🚨 ${status.bins.urgent} urgent bins detected with ${status.trucks.available} available trucks`);
+                }
+                
+                // Update auto-optimization status
+                await loadAutoOptimizationStatus();
+                
+            } catch (error) {
+                console.error('Failed to monitor auto-optimization:', error);
+            }
+        }
+
+        // Initialize monitoring for auto-optimization
+        function startAutoOptimizationMonitoring() {
+            setInterval(monitorAutoOptimization, CONFIG.AUTO_OPTIMIZATION_CHECK_INTERVAL);
+        }
+
+        // Cleanup function
+        function cleanup() {
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+            }
+            if (autoOptimizationTimer) {
+                clearInterval(autoOptimizationTimer);
+            }
+            if (socket) {
+                socket.disconnect();
+            }
+        }
+
+        // Handle page unload
+        window.addEventListener('beforeunload', cleanup);
+
+        // Handle visibility change to pause/resume updates
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Page is hidden, reduce update frequency
+                if (autoRefreshTimer) {
+                    clearInterval(autoRefreshTimer);
+                    autoRefreshTimer = setInterval(async () => {
+                        try {
+                            await loadRoutes(); // Only update routes when hidden
+                        } catch (error) {
+                            console.error('Failed to refresh routes:', error);
+                        }
+                    }, CONFIG.UPDATE_INTERVAL * 3); // 3x slower when hidden
+                }
+            } else {
+                // Page is visible, resume normal updates
+                startAutoRefresh();
+            }
+        });
+
+        // Enhanced error handling
+        window.addEventListener('error', function(event) {
+            console.error('Global error:', event.error);
+            showNotification('An unexpected error occurred', 'error');
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // Prevent shortcuts when typing in inputs
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') {
+                return;
+            }
+            
+            switch (event.key) {
+                case ' ': // Spacebar - toggle play/pause
+                    event.preventDefault();
+                    togglePlayPause();
+                    break;
+                case 'o': // O - trigger optimization
+                    event.preventDefault();
+                    triggerOptimization();
+                    break;
+                case 'c': // C - collect urgent bins
+                    event.preventDefault();
+                    collectUrgentBins();
+                    break;
+                case 'm': // M - toggle mode
+                    event.preventDefault();
+                    setOptimizationMode(optimizationMode === 'auto' ? 'manual' : 'auto');
+                    break;
+                case 's': // S - open settings
+                    event.preventDefault();
+                    openAdvancedModal();
+                    break;
+                case 'r': // R - refresh data
+                    event.preventDefault();
+                    loadInitialData();
+                    break;
+                case 'Escape': // Escape - close modals
+                    closeAdvancedModal();
+                    break;
+            }
+        });
+
+        // Touch/mobile support
+        let touchStartX, touchStartY;
+
+        document.addEventListener('touchstart', function(event) {
+            touchStartX = event.touches[0].clientX;
+            touchStartY = event.touches[0].clientY;
+        });
+
+        document.addEventListener('touchend', function(event) {
+            if (!touchStartX || !touchStartY) return;
+            
+            const touchEndX = event.changedTouches[0].clientX;
+            const touchEndY = event.changedTouches[0].clientY;
+            
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            // Swipe gestures
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+                if (deltaX > 0) {
+                    // Swipe right - maybe switch to next tab or something
+                } else {
+                    // Swipe left - maybe switch to previous tab
+                }
+            }
+            
+            touchStartX = null;
+            touchStartY = null;
+        });
+
+        // Performance monitoring
+        let performanceMetrics = {
+            apiCalls: 0,
+            apiErrors: 0,
+            renderTime: 0,
+            lastUpdate: Date.now()
+        };
+
+        function trackPerformance() {
+            setInterval(() => {
+                const now = Date.now();
+                const timeSinceLastUpdate = now - performanceMetrics.lastUpdate;
+                
+                if (timeSinceLastUpdate > CONFIG.UPDATE_INTERVAL * 2) {
+                    console.warn('Performance warning: Update interval exceeded');
+                }
+                
+                performanceMetrics.lastUpdate = now;
+                
+                // Log performance metrics every minute
+                if (now % 60000 < 1000) {
+                    console.log('Performance metrics:', performanceMetrics);
+                }
+            }, 1000);
+        }
+
+        // Start performance monitoring
+        trackPerformance();
+
+        // Development helpers (only in development)
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            window.cleanifyDebug = {
+                simulationData,
+                optimizationMode,
+                markers,
+                routes,
+                CONFIG,
+                apiCall,
+                loadInitialData,
+                showNotification,
+                performanceMetrics
+            };
+            
+            console.log('🛠️ Cleanify Debug tools available in window.cleanifyDebug');
+            console.log('⌨️ Keyboard shortcuts: Space (play/pause), O (optimize), C (collect urgent), M (toggle mode), S (settings), R (refresh)');
+        }
+
+        // Initialize tooltips for better UX
+        function initializeTooltips() {
+            const tooltipElements = document.querySelectorAll('[title]');
+            tooltipElements.forEach(element => {
+                element.addEventListener('mouseenter', function() {
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'custom-tooltip';
+                    tooltip.textContent = this.getAttribute('title');
+                    tooltip.style.cssText = `
+                        position: absolute;
+                        background: rgba(0,0,0,0.8);
+                        color: white;
+                        padding: 0.5rem;
+                        border-radius: 4px;
+                        font-size: 0.8rem;
+                        z-index: 10000;
+                        pointer-events: none;
+                        white-space: nowrap;
+                    `;
+                    
+                    document.body.appendChild(tooltip);
+                    
+                    const rect = this.getBoundingClientRect();
+                    tooltip.style.left = rect.left + 'px';
+                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 5) + 'px';
+                    
+                    this._tooltip = tooltip;
+                });
+                
+                element.addEventListener('mouseleave', function() {
+                    if (this._tooltip) {
+                        this._tooltip.remove();
+                        this._tooltip = null;
+                    }
+                });
+            });
+        }
+
+        // Initialize tooltips after DOM is ready
+        setTimeout(initializeTooltips, 100);
+
+        console.log('🚛 Cleanify Pro initialized successfully');
+        console.log('🤖 Auto-optimization and enhanced route following enabled');
     </script>
 </body>
 </html>
